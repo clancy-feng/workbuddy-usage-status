@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorkBuddy 使用状态 Dashboard</title>
+<!--CHART_JS-->
+<style>
+  :root{
+    --bg:#15171c; --panel:#1e2129; --panel2:#262a34; --border:#333845;
+    --text:#e6e9ef; --muted:#9aa3b2; --accent:#4f9dff; --red:#ff5c5c;
+    --green:#3ecf8e; --yellow:#ffcc66; --purple:#b58cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
+  header{padding:20px 28px;border-bottom:1px solid var(--border);background:var(--panel);}
+  header h1{margin:0;font-size:20px;font-weight:600;}
+  header .sub{color:var(--muted);font-size:12px;margin-top:6px;}
+  .wrap{padding:22px 28px;max-width:1400px;margin:0 auto;}
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
+  .kpi .label{color:var(--muted);font-size:12px;}
+  .kpi .val{font-size:24px;font-weight:700;margin-top:8px;}
+  .kpi .unit{font-size:12px;color:var(--muted);margin-left:4px;font-weight:400;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:18px;}
+  .card h3{margin:0 0 4px;font-size:14px;font-weight:600;}
+  .card .hint{color:var(--muted);font-size:11px;margin-bottom:12px;}
+  .card.full{grid-column:1 / -1;}
+  canvas{max-height:300px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .tbl-scroll{max-height:360px;overflow:auto;}
+  .note{color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px;}
+  .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);font-size:11px;}
+  .err{color:var(--red);}
+  @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>WorkBuddy 使用状态 Dashboard</h1>
+  <div class="sub" id="sub">加载中…</div>
+</header>
+<div class="wrap" id="app" style="display:none">
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card"><h3>每日积分消耗（credit）</h3><div class="hint">按天聚合的 session_usage credit 消耗（会话级，归因到会话首次出现日）</div><canvas id="cDailyTokens"></canvas></div>
+    <div class="card"><h3>每日思考用时</h3><div class="hint">generation span 时长之和，单位小时（模型推理/思考的代理指标）</div><canvas id="cDailyThink"></canvas></div>
+    <div class="card"><h3>各模型 Token 占比</h3><div class="hint">按模型名称聚合（来自 trace.modelInfo）</div><canvas id="cModelShare"></canvas></div>
+    <div class="card"><h3>各模型思考效率</h3><div class="hint">输出 token / 思考秒数，越高越“省时”</div><canvas id="cModelEff"></canvas></div>
+    <div class="card full"><h3>思考效率散点：思考用时 × 输出 token</h3><div class="hint">每个点=一次请求；右下方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
+    <div class="card full"><h3>Top 会话（按 token 消耗）</h3><div class="hint">会话标题 + 模型 + 思考用时 + credit 消耗</div>
+      <div class="tbl-scroll"><table id="tSessions"><thead><tr>
+        <th>会话标题</th><th>模型</th><th class="num">请求数</th><th class="num">Token</th>
+        <th class="num">思考(分)</th><th class="num">Credit</th><th class="num">错误</th><th>状态</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="card full"><h3>每日错误数</h3><div class="hint">span 级 status=error 的计数</div><canvas id="cErrors"></canvas></div>
+  </div>
+
+  <div class="note" id="note"></div>
+</div>
+
+<!--USAGE_DATA-->
+<script>
+const T = window.USAGE_STATUS;
+if(!T){ document.getElementById('sub').textContent='数据未加载：请重新运行 usage_extractor.py 生成自包含仪表盘。'; }
+else { render(); }
+
+function fmt(n){ return (n||0).toLocaleString('en-US'); }
+function short(n){ if(n>=1e9)return (n/1e9).toFixed(2)+'B'; if(n>=1e6)return (n/1e6).toFixed(2)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'K'; return ''+n; }
+
+function render(){
+  const s=T.summary;
+  document.getElementById('sub').innerHTML =
+    `生成时间 ${s.generated_at} ｜ 数据范围 ${s.date_min} ~ ${s.date_max} ｜ 请求 ${fmt(s.total_requests)} ｜ 会话 ${s.total_sessions} ｜ 模型 ${s.model_count}`;
+
+  const app=document.getElementById('app'); app.style.display='block';
+  const kpis=[
+    {label:'总请求数',val:fmt(s.total_requests)},
+    {label:'总 Token',val:short(s.total_tokens),unit:fmt(s.total_tokens)},
+    {label:'思考用时',val:s.total_thinking_hours,unit:'小时'},
+    {label:'平均效率',val:s.avg_efficiency_tok_per_sec,unit:'tok/s'},
+    {label:'Credit 消耗',val:s.total_credit},
+    {label:'错误数',val:s.total_errors,err:s.total_errors>0},
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k=>
+    `<div class="kpi"><div class="label">${k.label}</div>
+     <div class="val ${k.err?'err':''}">${k.val}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div></div>`).join('');
+
+  Chart.defaults.color='#9aa3b2';
+  Chart.defaults.borderColor='#333845';
+  Chart.defaults.font.family='-apple-system,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif';
+
+  const grid={color:'#2a2f3a'};
+  // 每日 token
+  new Chart(cDailyTokens,{type:'line',data:{labels:T.by_day.map(d=>d.date),
+    datasets:[{label:'Credit',data:T.by_day.map(d=>d.credit),borderColor:'#4f9dff',
+      backgroundColor:'rgba(79,157,255,.15)',fill:true,tension:.3,pointRadius:2}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}});
+
+  // 每日思考用时(小时)
+  new Chart(cDailyThink,{type:'bar',data:{labels:T.by_day.map(d=>d.date),
+    datasets:[{label:'思考(小时)',data:T.by_day.map(d=>(d.thinking_sec/3600).toFixed(2)),
+      backgroundColor:'#b58cff'}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}});
+
+  // 模型占比
+  new Chart(cModelShare,{type:'doughnut',data:{labels:T.by_model.map(m=>m.model),
+    datasets:[{data:T.by_model.map(m=>m.tokens),
+      backgroundColor:['#4f9dff','#3ecf8e','#ffcc66','#b58cff','#ff5c5c','#5ad1c4','#f0934f','#8ab4f8']}]},
+    options:{plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}}}});
+
+  // 模型效率
+  new Chart(cModelEff,{type:'bar',data:{labels:T.by_model.map(m=>m.model),
+    datasets:[{label:'tok/s',data:T.by_model.map(m=>m.efficiency_tok_per_sec),
+      backgroundColor:'#3ecf8e'}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}});
+
+  // 散点
+  const pts=T.requests_sample.map(r=>({x:+(r.thinking_sec).toFixed(1),y:r.output,
+    m:r.model,t:r.tokens}));
+  new Chart(cScatter,{type:'scatter',data:{datasets:[{label:'请求',data:pts,
+    backgroundColor:'rgba(79,157,255,.5)',pointRadius:4}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>
+      `模型 ${c.raw.m} | 思考 ${c.raw.x}s | 输出 ${fmt(c.raw.y)} tok`}}},
+      scales:{x:{title:{display:true,text:'思考用时(秒)'},grid},
+        y:{title:{display:true,text:'输出 token'},grid,ticks:{callback:v=>short(v)}}}}});
+
+  // 错误
+  new Chart(cErrors,{type:'bar',data:{labels:T.by_day.map(d=>d.date),
+    datasets:[{label:'错误',data:T.by_day.map(d=>d.errors),backgroundColor:'#ff5c5c'}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}});
+
+  // 会话表
+  const tb=document.querySelector('#tSessions tbody');
+  tb.innerHTML=T.by_session.slice(0,10).map(x=>`<tr>
+    <td>${esc(x.title||'(无标题)')}</td><td><span class="tag">${esc(x.models||'?')}</span></td>
+    <td class="num">${x.requests}</td><td class="num">${fmt(x.tokens)}</td>
+    <td class="num">${(x.thinking_sec/60).toFixed(1)}</td>
+    <td class="num">${x.credit}</td>
+    <td class="num ${x.errors?'err':''}">${x.errors}</td>
+    <td>${x.status||''}</td></tr>`).join('');
+
+  document.getElementById('note').textContent='说明：'+s.note;
+}
+function esc(s){return (''+s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+</script>
+</body>
+</html>

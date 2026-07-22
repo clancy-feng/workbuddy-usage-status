@@ -1,0 +1,17 @@
+# Python 运行时垃圾
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# ClawHub CLI 缓存
+.clawhub/
+
+# Skill 运行时生成的用户侧产物（绝对不能提交）
+telemetry.json
+telemetry.js
+workbuddy-telemetry-dashboard.html
