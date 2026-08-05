@@ -25,25 +25,25 @@ allowed-tools: python3, read_file, write_file
 | `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(按模型哈希拆分的 credit 消耗)                            | token 消耗 / 费用                   |
 | `~/.workbuddy/traces/*/trace_*.json`          | 每次请求的 `duration`、token 拆分(input/output/cached)、`callCount`、`modelInfo.models`，以及 `spans` 时序 | **思考用时**、**思考效率**、模型分布、工具调用、错误数 |
 
+## 安装
+
+#### 方式一：通过 WorkBuddy 对话安装
+
+把 SkillHub 提供的 prompt 发给你的 WorkBuddy 即可：
+请根据 https://skillhub.cn/install/skillhub.md ，安装 workbuddy-usage-status。
+
+#### 方式二：手动安装到本地
+
+git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/skills/workbuddy-usage-status
+
 ## 用法
 
-```bash
-# 默认：把 dashboard 生成到“当前工作目录”
-python3 scripts/usage_extractor.py
-
-# 指定输出目录
-python3 scripts/usage_extractor.py --out /path/to/out
-
-# 指定 WorkBuddy 数据根（一般不用，默认 ~/.workbuddy）
-python3 scripts/usage_extractor.py --home /other/.workbuddy
-```
-
-运行后会在输出目录生成 3 个文件，直接打开 `workbuddy-usage-status-dashboard.html` 即可：
+装好后，在 WorkBuddy 对话里说"workbuddy 使用统计"，或命令行跑 `python3 scripts/usage_extractor.py`，运行后会在输出目录生成 3 个文件，直接打开 `workbuddy-usage-status-dashboard.html` 即可：
 
 - `workbuddy-usage-status-dashboard.html` —— **自包含单文件**，数据 + Chart.js 均已内联，双击/预览即可看，零外网依赖
 - `usage-status.json` / `usage-status.js` —— 原始聚合数据，供二次处理
 
-## 指标定义（务必先讲清楚再展示）
+## 指标定义
 
 - **思考用时**：每条 trace 里 `type=generation` 的 span 时长之和（模型推理/思考的代理指标，单位秒/小时）
 - **思考效率**：输出 token ÷ 思考秒数（tok/s，越高越“省时”）
