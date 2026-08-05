@@ -1,3 +1,16 @@
+> **Skill Overview** 
+> 
+> **WorkBuddy Usage Status** turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. All data stays on your machine under `~/.workbuddy/`; no network, no external APIs. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies.
+> 
+> **How to invoke**
+> 
+> - **Chat trigger:** say any of these in a WorkBuddy conversation and the skill is auto-detected: "workbuddy usage stats" / "telemetry" / "usage" / "token consumption" / "thinking efficiency" / "model cost" / "cost control" / "how much has workbuddy used".
+> - **CLI:** `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`). Python 3.10+, standard library only.
+> 
+> The full Chinese documentation is preserved below.
+
+---
+
 #WorkBuddy Usage Status
 
 把 WorkBuddy 自己的本地使用数据，变成一份**离线、可监督**的 Dashboard。
