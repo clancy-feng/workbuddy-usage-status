@@ -1,5 +1,7 @@
+
 > **Skill Overview** 
 > 
+![WorkBuddy Usage Dashboard](dashboard-preview.png)
 > **WorkBuddy Usage Status** turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. All data stays on your machine under `~/.workbuddy/`; no network, no external APIs. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies.
 > 
 > **How to invoke**
