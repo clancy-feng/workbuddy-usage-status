@@ -25,14 +25,18 @@ allowed-tools: python3, read_file, write_file
 | `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(按模型哈希拆分的 credit 消耗)                            | token 消耗 / 费用                   |
 | `~/.workbuddy/traces/*/trace_*.json`          | 每次请求的 `duration`、token 拆分(input/output/cached)、`callCount`、`modelInfo.models`，以及 `spans` 时序 | **思考用时**、**思考效率**、模型分布、工具调用、错误数 |
 
-## 安装
+## 如何安装
 
 #### 方式一：通过 WorkBuddy 对话安装
 
 把 SkillHub 提供的 prompt 发给你的 WorkBuddy 即可：
 请根据 https://skillhub.cn/install/skillhub.md ，安装 workbuddy-usage-status。
 
-#### 方式二：手动安装到本地
+### 方式二：通过 Clawhub 安装
+
+clawhub install workbuddy-usage-status
+
+#### 方式三：手动安装到本地
 
 git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/skills/workbuddy-usage-status
 

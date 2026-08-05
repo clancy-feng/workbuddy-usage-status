@@ -1,7 +1,7 @@
-
 > **Skill Overview** 
-> 
+
 ![WorkBuddy Usage Dashboard](dashboard-preview.png)
+
 > **WorkBuddy Usage Status** turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. All data stays on your machine under `~/.workbuddy/`; no network, no external APIs. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies.
 > 
 > **How to invoke**
@@ -32,25 +32,20 @@
 
 ---
 
-## 2. 装到另一台机器（搬运）
+## 2. 如何安装
 
-整个 `workbuddy-usage-status/` 文件夹复制到目标机器的用户级 skill 目录 ~/.workbuddy/skills/
+方式一：通过 WorkBuddy 对话安装
 
-~/.workbuddy/skills/workbuddy-usage-status/
+把 SkillHub 提供的 prompt 发给你的 WorkBuddy 即可：
+请根据 https://skillhub.cn/install/skillhub.md ，安装 workbuddy-usage-status。
 
-├── SKILL.md
+方式二：通过 Clawhub 安装
 
-├── README.md
+clawhub install workbuddy-usage-status
 
-└── scripts/
+方式三：手动安装到本地
 
-├── usage_extractor.py      # 抽取+聚合+内联注入（仅标准库）
-
-├── dashboard_template.html     # 看板模板，被抽取器注入数据与 Chart.js
-
-└── chart.umd.min.js            # 随包已含的 Chart.js（离线内联用，发布版必带）
-
-重启 WorkBuddy 后，skill 会被自动识别。
+git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/skills/workbuddy-usage-status
 
 ---
 
