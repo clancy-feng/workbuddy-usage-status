@@ -4,6 +4,10 @@
 
 > **WorkBuddy Usage Status** turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. All data stays on your machine under `~/.workbuddy/`; no network, no external APIs. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies.
 > 
+> **How to install**
+> 
+> clawhub install workbuddy-usage-status
+> 
 > **How to invoke**
 > 
 > - **Chat trigger:** say any of these in a WorkBuddy conversation and the skill is auto-detected: "workbuddy usage stats" / "telemetry" / "usage" / "token consumption" / "thinking efficiency" / "model cost" / "cost control" / "how much has workbuddy used".
