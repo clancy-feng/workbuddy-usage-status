@@ -240,6 +240,7 @@ for sb in by_session.values():
     sb["title"] = meta.get("title", "")[:60]
     sb["status"] = meta.get("status", "")
     sb["models"] = ",".join(sorted(sb["models"]))
+    sb["model"] = meta.get("model", "") or "unknown"
     sb["thinking_sec"] = round(sb["thinking_sec"], 1)
     # credit 每个会话只计一次(来自 session_usage 的会话级汇总)
     cr = sess_credit.get(sb["session_id"], {}).get("credit", 0)
@@ -251,6 +252,99 @@ for sb in by_session.values():
     sess_list.append(sb)
 sess_list.sort(key=lambda x: x["tokens"], reverse=True)
 
+# ---------- 2.6 模型性价比 (会话级 model 聚合, 关联 sessions.model) ----------
+print("[2.6] 模型性价比 ...", flush=True)
+model_cost = {}
+for sb in sess_list:
+    m = sb.get("model") or "unknown"
+    mc = model_cost.setdefault(
+        m,
+        {"model": m, "sessions": 0, "tokens": 0, "credit": 0.0},
+    )
+    mc["sessions"] += 1
+    mc["tokens"] += sb["tokens"]
+    mc["credit"] += sb["credit"]
+model_cost_list = []
+for mc in model_cost.values():
+    if mc["model"] == "unknown" or mc["tokens"] <= 0:
+        continue
+    c1k = (mc["credit"] / mc["tokens"] * 1000.0) if mc["tokens"] else 0.0
+    mc["credit_per_1k"] = round(c1k, 5)
+    model_cost_list.append(mc)
+model_cost_list.sort(key=lambda x: x["credit_per_1k"])
+
+# 优化建议: 在可比任务量(≥1000万token)的通用模型间, 比较最便宜与最贵
+model_tips = []
+substantial = [
+    m for m in model_cost_list
+    if m["model"] not in ("auto", "unknown")
+    and "preview" not in m["model"]
+    and "agent" not in m["model"]
+    and m["tokens"] >= 10_000_000
+]
+if len(substantial) >= 2:
+    cheapest = min(substantial, key=lambda x: x["credit_per_1k"])
+    priciest = max(substantial, key=lambda x: x["credit_per_1k"])
+    if priciest["credit_per_1k"] > 0:
+        save = (priciest["credit_per_1k"] - cheapest["credit_per_1k"]) / priciest["credit_per_1k"] * 100
+        if save >= 5:
+            model_tips.append(
+                f"在可比任务量下(均≥1000万token),切换至「{cheapest['model']}」"
+                f"(credit/1k={cheapest['credit_per_1k']}) 相比「{priciest['model']}」"
+                f"(credit/1k={priciest['credit_per_1k']}) 预计节省约 {save:.0f}% 的 credit；"
+                f"前提是两个模型处理的工作负载可互相迁移。")
+
+# ---------- 2.5 异常检测 ----------
+print("[2.5] 异常检测 ...", flush=True)
+WINDOW = 7
+for i, d in enumerate(day_list):
+    w = day_list[max(0, i - WINDOW + 1): i + 1]
+    vals = [x["tokens"] for x in w]
+    if len(vals) >= 3:
+        mean = sum(vals) / len(vals)
+        var = sum((v - mean) ** 2 for v in vals) / len(vals)
+        std = var ** 0.5
+    else:
+        mean = float(d["tokens"]); std = 0.0
+    d["roll_mean"] = round(mean, 1)
+    d["roll_std"] = round(std, 1)
+    z = (d["tokens"] - mean) / std if std > 0 else 0.0
+    d["zscore"] = round(z, 2)
+    d["anomaly_day"] = (std > 0 and abs(z) > 2)
+
+sess_tokens_sorted = sorted(sb["tokens"] for sb in sess_list)
+def _pct(data, p):
+    if not data:
+        return 0
+    k = (len(data) - 1) * p
+    f = int(k); c = min(f + 1, len(data) - 1)
+    return data[f] + (data[c] - data[f]) * (k - f)
+p95 = _pct(sess_tokens_sorted, 0.95)
+for sb in sess_list:
+    sb["anomaly_session"] = (sb["tokens"] > p95)
+
+anomaly_days = [{"date": d["date"], "tokens": d["tokens"],
+                 "mean": d["roll_mean"], "std": d["roll_std"], "z": d["zscore"]}
+                for d in day_list if d.get("anomaly_day")]
+anomaly_sessions = [{"session_id": sb["session_id"],
+                     "title": (sb.get("title") or "")[:60],
+                     "tokens": sb["tokens"], "p95": round(p95, 1)}
+                    for sb in sess_list if sb.get("anomaly_session")]
+anomalies = {
+    "daily_window": WINDOW,
+    "p95_session_tokens": round(p95, 1),
+    "days": anomaly_days,
+    "sessions": anomaly_sessions,
+    "has_anomaly": bool(anomaly_days or anomaly_sessions),
+    "suggestions": [],
+}
+for d in anomaly_days:
+    anomalies["suggestions"].append(
+        f"{d['date']} 当日 token {d['tokens']:,} 偏离 7 日滚动均值 {int(d['mean']):,} 达 {d['z']:.1f}σ，建议核查当日是否有大任务或重复跑。")
+for sb in anomaly_sessions:
+    anomalies["suggestions"].append(
+        f"会话「{sb['title'] or '(无标题)'}」消耗 {sb['tokens']:,} token，超过历史 95 分位({int(sb['p95']):,})，建议检查是否可拆分或精简。")
+
 total_tokens = sum(r["tokens"] for r in requests)
 total_input = sum(r["input"] for r in requests)
 total_output = sum(r["output"] for r in requests)
@@ -261,6 +355,7 @@ total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
 summary = {
+    "version": "1.2.0",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "total_requests": len(requests),
     "total_sessions": len(sess_list),
@@ -277,7 +372,7 @@ summary = {
     "date_min": min(dates) if dates else None,
     "date_max": max(dates) if dates else None,
     "model_count": len(model_list),
-    "note": "credit 按会话汇总(模型哈希无法反解为名称);思考用时=generation span 时长之和,为模型推理/思考的代理指标。",
+    "note": "credit 按会话汇总并关联 sessions.model 得到模型级性价比(credit/1k token);约 44% 的 trace 含 sessionId 可归因,其余(多为 auto/旧格式)归入 unknown;'auto' 表示会话未锁定具体模型;思考用时=generation span 时长之和,为模型推理/思考的代理指标。",
 }
 
 # 只保留 top 300 请求用于散点图, 控制文件体积
@@ -291,6 +386,9 @@ out = {
     "by_model": model_list,
     "by_session": sess_list[:200],
     "requests_sample": requests_trim,
+    "anomalies": anomalies,
+    "by_model_cost": model_cost_list,
+    "model_tips": model_tips,
 }
 
 

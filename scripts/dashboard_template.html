@@ -37,6 +37,10 @@
   .note{color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px;}
   .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);font-size:11px;}
   .err{color:var(--red);}
+  .ok{color:var(--green);font-size:14px;font-weight:600;}
+  .alert-sub{color:var(--muted);font-size:12px;margin:10px 0 4px;font-weight:600;}
+  #alertBody ul{margin:4px 0;padding-left:18px;}
+  #alertBody li{font-size:12px;line-height:1.7;}
   @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -47,6 +51,12 @@
 </header>
 <div class="wrap" id="app" style="display:none">
   <div class="kpis" id="kpis"></div>
+
+  <div class="card full" id="alertCard">
+    <h3>异常警报</h3>
+    <div class="hint">每日 token 的 7 日滚动 2σ 离群日 + 超过历史 95 分位的超额会话</div>
+    <div id="alertBody"></div>
+  </div>
 
   <div class="grid">
     <div class="card"><h3>每日积分消耗（credit）</h3><div class="hint">按天聚合的 session_usage credit 消耗（会话级，归因到会话首次出现日）</div><canvas id="cDailyTokens"></canvas></div>
@@ -59,6 +69,13 @@
         <th>会话标题</th><th>模型</th><th class="num">请求数</th><th class="num">Token</th>
         <th class="num">思考(分)</th><th class="num">Credit</th><th class="num">错误</th><th>状态</th>
       </tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="card full"><h3>模型性价比排行（credit / 千 token）</h3><div class="hint">按会话级模型(sessions.model)聚合 credit 与 token；数值越低越省。'auto'=未锁定模型，'unknown'=trace 无 sessionId 无法归因</div>
+      <div class="tbl-scroll"><table id="tModelCost"><thead><tr>
+        <th>模型</th><th class="num">会话数</th><th class="num">总 Token</th>
+        <th class="num">总 Credit</th><th class="num">Credit / 1k token</th>
+      </tr></thead><tbody></tbody></table></div>
+      <div class="note" id="modelTips"></div>
     </div>
     <div class="card full"><h3>每日错误数</h3><div class="hint">span 级 status=error 的计数</div><canvas id="cErrors"></canvas></div>
   </div>
@@ -146,6 +163,58 @@ function render(){
     <td class="num">${x.credit}</td>
     <td class="num ${x.errors?'err':''}">${x.errors}</td>
     <td>${x.status||''}</td></tr>`).join('');
+
+  // 模型性价比表
+  const tmc = document.querySelector('#tModelCost tbody');
+  if (T.by_model_cost && T.by_model_cost.length) {
+    const best = Math.min.apply(null, T.by_model_cost.map(m => m.credit_per_1k));
+    const worst = Math.max.apply(null, T.by_model_cost.map(m => m.credit_per_1k));
+    tmc.innerHTML = T.by_model_cost.map(m => {
+      const col = (m.credit_per_1k === best) ? 'var(--green)'
+                : (m.credit_per_1k === worst) ? 'var(--red)' : '';
+      return `<tr>
+        <td><span class="tag">${esc(m.model)}</span></td>
+        <td class="num">${m.sessions}</td>
+        <td class="num">${fmt(m.tokens)}</td>
+        <td class="num">${m.credit}</td>
+        <td class="num" style="color:${col};font-weight:600">${m.credit_per_1k}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    tmc.innerHTML = '<tr><td colspan="5" class="err">无模型级数据（trace 均未携带 sessionId）</td></tr>';
+  }
+  // 模型优化建议
+  const mt = document.getElementById('modelTips');
+  if (T.model_tips && T.model_tips.length) {
+    mt.innerHTML = '<b>优化建议：</b><br>' + T.model_tips.map(t => '• ' + esc(t)).join('<br>');
+  } else {
+    mt.textContent = '提示：可比模型样本不足，暂无可生成的切换建议；或多数会话为 auto / unknown。';
+  }
+
+  // 异常警报
+  const an = T.anomalies || {has_anomaly:false, suggestions:[], days:[], sessions:[], p95_session_tokens:0};
+  const ab = document.getElementById('alertBody');
+  if(!an.has_anomaly){
+    ab.innerHTML = '<div class="ok">✅ 一切正常</div>';
+  } else {
+    let h = '';
+    if(an.days && an.days.length){
+      h += '<div class="alert-sub">异常日（|z|&gt;2，7 日滚动）</div><ul>';
+      an.days.forEach(d=>{ h += `<li>📅 ${d.date}：token ${fmt(d.tokens)}，偏离均值 ${d.z}σ</li>`; });
+      h += '</ul>';
+    }
+    if(an.sessions && an.sessions.length){
+      h += `<div class="alert-sub">超额会话（&gt;历史95分位 ${fmt(an.p95_session_tokens)}）</div><ul>`;
+      an.sessions.forEach(s=>{ h += `<li>💬 ${esc(s.title||'(无标题)')}：token ${fmt(s.tokens)}</li>`; });
+      h += '</ul>';
+    }
+    if(an.suggestions && an.suggestions.length){
+      h += '<div class="alert-sub">建议</div><ul>';
+      an.suggestions.forEach(t=>{ h += `<li>${esc(t)}</li>`; });
+      h += '</ul>';
+    }
+    ab.innerHTML = h;
+  }
 
   document.getElementById('note').textContent='说明：'+s.note;
 }

@@ -1,9 +1,16 @@
 ---
 name: "workbuddy-usage-status"
-version: 1.0.0
-description: "一款把 WorkBuddy 的运行数据可视化的技能。当用户提到“workbuddy 使用统计”“用量控制”“思考效率”“token 消耗”“telemetry”“workbuddy 自己用了多少”等关键词时触发。纯本地、零外部接口、可搬运到其他装了 WorkBuddy 的机器。"
+version: 1.2.0
+description: "离线可视化 WorkBuddy 本地使用数据：token 消耗、credit 消耗、思考效率、模型分布、模型性价比(credit/千token)排名与切换建议、用量异常检测(离群日/超额会话警报)、错误监控。当用户提到 'workbuddy 使用统计' '用量控制' '思考效率' 'token 消耗' 'telemetry' 'workbuddy 自己用了多少' 'AI 成本监控' 'agent 用量' 'credit 消耗追踪' 'workbuddy /cost' '用了多少额度' '烧了多少钱' '哪个模型最省' '模型性价比' '用量异常' '哪个会话最费' 时触发。纯本地、零外网依赖、可搬运。"
 agent_created: true
 allowed-tools: python3, read_file, write_file
+metadata:
+  clawdbot:
+    emoji: "📊"
+    requires:
+      bins:
+        - python3
+    requires.env: []
 ---
 
 # WorkBuddy Usage Status
@@ -22,7 +29,7 @@ allowed-tools: python3, read_file, write_file
 | 来源                                            | 内容                                                                                          | 对应指标                            |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- |
 | `~/.workbuddy/workbuddy.db` → `sessions`      | 会话标题、模型、状态、创建/更新时间                                                                          | 按会话/项目归集                        |
-| `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(按模型哈希拆分的 credit 消耗)                            | token 消耗 / 费用                   |
+| `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(会话级 credit 消耗汇总)                            | token 消耗 / 费用 / 模型级 credit 性价比（关联 sessions.model）                   |
 | `~/.workbuddy/traces/*/trace_*.json`          | 每次请求的 `duration`、token 拆分(input/output/cached)、`callCount`、`modelInfo.models`，以及 `spans` 时序 | **思考用时**、**思考效率**、模型分布、工具调用、错误数 |
 
 ## 如何安装
@@ -56,7 +63,7 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 ## 已知限制
 
-1. `session_usage.credit_json` 的 key 是**模型哈希**，WorkBuddy 未提供哈希→名称映射，故 credit 只能到**会话级**；token 可按真实模型名（`trace.modelInfo.models`）拆分。
+1. 模型级 credit 性价比已通过关联 `sessions.model`（会话选模字段）实现，credit 不再依赖 `credit_json` 的哈希（哈希无法反解名称，已绕过）。限制：约 44% 的 trace 含 `sessionId` 可归因到具体会话/模型，其余（多为 `auto`/旧格式）归入 `unknown`；`auto` 表示会话未锁定具体模型。
 2. 当前为**快照式**：手动/定时跑脚本生成。要实时监督需包成常驻服务。
 3. Dashboard 已彻底离线：Chart.js 随包内联进 HTML，零外网依赖，预览/双击均可正常出图。`chart.umd.min.js` 为发布版必带文件，抽取器强依赖它；缺失则脚本直接报错退出，不回退 CDN。
 4. 解析全量 traces（可能上千文件、上 GB）约需 10–30 秒，属一次性开销。
