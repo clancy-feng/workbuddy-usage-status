@@ -20,17 +20,16 @@ metadata:
 
 ## 适用场景
 
-- 想看 WorkBuddy 的 token 消耗、思考用时、思考效率、各模型成本
-- 需要“使用监督/用量控制”：哪个会话/模型最费、错误集中在哪、哪天用量飙升
-- 想把这套看板搬到其他装了 WorkBuddy 的机器上复用
+- 直观看到 WorkBuddy 的 token 消耗、思考用时、思考效率、各模型成本
+- 使用监督/用量控制：哪个会话/模型最费、错误集中在哪、哪天用量飙升
 
 ## 数据源（已验证存在）
 
-| 来源                                            | 内容                                                                                          | 对应指标                            |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- |
-| `~/.workbuddy/workbuddy.db` → `sessions`      | 会话标题、模型、状态、创建/更新时间                                                                          | 按会话/项目归集                        |
-| `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(会话级 credit 消耗汇总)                            | token 消耗 / 费用 / 模型级 credit 性价比（关联 sessions.model）                   |
-| `~/.workbuddy/traces/*/trace_*.json`          | 每次请求的 `duration`、token 拆分(input/output/cached)、`callCount`、`modelInfo.models`，以及 `spans` 时序 | **思考用时**、**思考效率**、模型分布、工具调用、错误数 |
+| 来源                                            | 内容                                                                                          | 对应指标                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `~/.workbuddy/workbuddy.db` → `sessions`      | 会话标题、模型、状态、创建/更新时间                                                                          | 按会话/项目归集                                          |
+| `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(会话级 credit 消耗汇总)                               | token 消耗 / 费用 / 模型级 credit 性价比（关联 sessions.model） |
+| `~/.workbuddy/traces/*/trace_*.json`          | 每次请求的 `duration`、token 拆分(input/output/cached)、`callCount`、`modelInfo.models`，以及 `spans` 时序 | **思考用时**、**思考效率**、模型分布、工具调用、错误数                   |
 
 ## 如何安装
 
@@ -64,14 +63,14 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 ## 已知限制
 
 1. 模型级 credit 性价比已通过关联 `sessions.model`（会话选模字段）实现，credit 不再依赖 `credit_json` 的哈希（哈希无法反解名称，已绕过）。限制：约 44% 的 trace 含 `sessionId` 可归因到具体会话/模型，其余（多为 `auto`/旧格式）归入 `unknown`；`auto` 表示会话未锁定具体模型。credit 值来自 `session_usage.used`，已包含 WorkBuddy 内部倍率/折扣/限免；本 skill 只做读取和聚合，不做二次换算。
-2. 当前为**快照式**：手动/定时跑脚本生成。要实时监督需包成常驻服务。
-3. Dashboard 已彻底离线：Chart.js 随包内联进 HTML，零外网依赖，预览/双击均可正常出图。`chart.umd.min.js` 为发布版必带文件，抽取器强依赖它；缺失则脚本直接报错退出，不回退 CDN。
-4. 解析全量 traces（可能上千文件、上 GB）约需 10–30 秒，属一次性开销。
+2. 当前为**快照式**：手动/定时跑脚本生成，要实时监督需包成常驻服务。
+3. 解析全量 traces（可能上千文件、上 GB）约需 10–30 秒，属一次性开销。
 
 ## 可移植性
 
 - 脚本只依赖 Python 标准库（`sqlite3/json/glob/os/datetime/argparse`），**不需要 pip 安装任何包**。
 - 数据源路径用 `os.path.expanduser("~/.workbuddy")`，任何装了 WorkBuddy 的机器路径一致。
+- Dashboard 彻底离线，Chart.js 随包内联进 HTML，零外网依赖，预览/双击均可正常出图。
 - 模板 `dashboard_template.html` 与脚本同目录打包，输出落到 `--out`（默认 cwd），与脚本位置无关。
 - 搬运方式：把整个 `workbuddy-usage-status/` 文件夹复制到目标机器的 `~/.workbuddy/skills/` 下即可。
 

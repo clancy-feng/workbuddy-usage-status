@@ -118,6 +118,9 @@ for i, fp in enumerate(files):
     ended = parse_ts(tr.get("endedAt") or tr.get("ended_at"))
     duration_ms = tr.get("duration") or (int(ended - started) if started and ended else 0)
     total_tokens = tr.get("totalTokens") or 0
+    # 仅统计有实际 token 消耗的会话级运行；无 token 的工作流记账（零用量噪声）不计入用量基数
+    if total_tokens <= 0:
+        continue
     in_tok = mi.get("totalInputTokens") or 0
     out_tok = mi.get("totalOutputTokens") or 0
     cached_tok = mi.get("totalCachedTokens") or 0

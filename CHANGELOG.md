@@ -47,7 +47,7 @@
 - `credit` 来自 `session_usage.used`，已含 WorkBuddy 内部倍率 / 折扣 / 限免，skill 不做二次换算。
 
 ### 已知限制
-- trace → session 关联靠 `trace.sessionId`，实测覆盖率约 44%（3092 个 trace 中 1361 个带 sessionId）；模型排名 / 高峰下钻基于有归属的部分数据，非 100% 全量——**总量与每日趋势仍完整准确**，仅会话级下钻偏少归 `unknown`。
+- 用量统计仅计入有 token 消耗的有效 trace，零 token 工作流记账（噪声）排除；有效 trace 的 `sessionId` 与 `sessions` 表 100% 对应，会话级归因完整，无「覆盖率稀释」问题。宏观总量/每日趋势/模型占比来自有效 trace 与 `session_usage` 表，完整准确。
 - `credit_json` 仍只能到会话级，无法精确拆分到单次 generation span。
 
 ---
