@@ -1,7 +1,7 @@
 ---
 name: "workbuddy-usage-status"
 version: 1.1.0
-description: "离线可视化 WorkBuddy 本地使用数据：token 消耗、credit 消耗、思考效率、模型分布、模型性价比(credit/千token)排名与切换建议、日期区间筛选、错误监控、用量高峰探查(自动定位 credit 最高的几天并拆解主导会话/模型构成/错误率)。当用户提到 'workbuddy 使用统计' '用量控制' '思考效率' 'token 消耗' 'telemetry' 'workbuddy 自己用了多少' 'AI 成本监控' 'agent 用量' 'credit 消耗追踪' 'workbuddy /cost' '用了多少额度' '烧了多少钱' '哪个模型最省' '模型性价比' '筛选日期' '哪天用最多' '用量峰值' '用量高峰' '哪天积分最高' '用量飙升' 时触发。纯本地、零外网依赖、可搬运。"
+description: "离线可视化 WorkBuddy 本地使用数据：token 消耗、credit 消耗、思考效率、模型分布、模型性价比(credit/千token)排名与切换建议、日期区间筛选、错误监控、用量高峰探查(自动定位 credit 最高的几天并拆解主导会话/模型构成/错误率)。当用户提到 'workbuddy 使用统计' '用量控制' '思考效率' 'token 消耗' 'workbuddy 自己用了多少' 'AI 成本监控' 'agent 用量' 'credit 消耗追踪' 'workbuddy /cost' '筛选日期' '哪天用最多' '用量峰值' '用量高峰' '哪天积分最高' '用量飙升' 时触发（仅限 WorkBuddy 自身用量语境）。纯本地、零外网依赖、可搬运。"
 agent_created: true
 allowed-tools: python3, read_file, write_file
 metadata:
@@ -77,7 +77,8 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 ## 安全与隐私声明
 
-- **数据范围**：仅读取当前用户本机 `~/.workbuddy/` 下的 `workbuddy.db` 和 `traces/`，不访问其他任何目录
+- **数据范围**：默认仅读取当前用户本机 `~/.workbuddy/` 下的 `workbuddy.db` 和 `traces/`，不访问其他任何目录
+- **可选数据根**：脚本支持 `--home <dir>` 把读取根指向其他目录（默认 `~/.workbuddy`），仅用于迁移/测试场景；该旗标会改变实际读取路径，请仅在可信目录使用，且仍只读取该目录下的 `workbuddy.db` 与 `traces/`
 - **网络行为**：零外部请求，不调用任何 API、不上传任何数据
 - **写入行为**：仅在指定的输出目录写入 3 个文件（HTML/JSON/JS），不修改 WorkBuddy 自身的任何数据
 - **数据库访问**：以只读模式（`mode=ro`）打开 `workbuddy.db`，不影响正在运行的 WorkBuddy

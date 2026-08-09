@@ -450,7 +450,8 @@ try:
     if "<!--CHART_JS-->" in tpl:
         tpl = tpl.replace("<!--CHART_JS-->", chart_tag)
 
-    inline = '<script>window.USAGE_STATUS = ' + json.dumps(out, ensure_ascii=False) + ';</script>'
+    # 转义 "</" 为 "<\/"，防止会话标题/模型名中的 "</script>" 冲破 script 边界（本地存储型 XSS 防护）
+    inline = '<script>window.USAGE_STATUS = ' + json.dumps(out, ensure_ascii=False).replace("</", "<\\/") + ';</script>'
     if "<!--USAGE_DATA-->" in tpl:
         html = tpl.replace("<!--USAGE_DATA-->", inline)
     else:
