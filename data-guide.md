@@ -2,8 +2,6 @@
 
 本文档解释 `workbuddy-usage-status` 看板里**每一个数字是怎么算出来的、数据从哪来、各个阈值/参数的含义**，供参考，看板页面本身只保留必要的简短提示。
 
-> 适用范围：skill 版本 **v1.4.3**。脚本 `scripts/usage_extractor.py` 是唯一计算来源，本文档与代码保持一致；若代码改动，以代码注释为准。
-
 ---
 
 ## 1. 数据来源
@@ -30,7 +28,7 @@
 
 - **Token 总量** `tokens` = trace 顶层 `totalTokens`。
 - **输入 / 输出 / 缓存 token** = `modelInfo.totalInputTokens` / `totalOutputTokens` / `totalCachedTokens`。
-- **思考用时** `thinking_sec` = 该 trace 里**所有 `type=generation`（模型推理）的 span 时长之和**（毫秒转秒）。工具调用（tool/mcp/function）时长不计入。它是"模型推理/思考"的**代理指标**，不是墙上时钟。
+- **思考用时** `thinking_sec` = 该 trace 里**所有 `type=generation`（模型推理）的 span 时长之和**（毫秒转秒）,工具调用（tool/mcp/function）时长不计入，它是"模型推理/思考"的**代理指标**。
 - **工具调用次数** `calls` = `modelInfo.callCount`。
 - **错误数** `errors` = trace 里 `status=error` 或带 `error` 字段的 span 数量（**span 级**，一次请求可能多个 span 报错）。
 - **模型名** `model` = `modelInfo.models` 拼接；无则记 `unknown`。
@@ -100,8 +98,6 @@
 
 ## 5. 用量高峰探查（自动定位明显高的使用日）
 
-这是看板里逻辑最复杂的一块，单独拆开讲。
-
 ### 5.1 选哪几天（"几天？怎么选的"）
 
 1. 先算**每日 credit 的中位数** `median_cr`。
@@ -124,7 +120,7 @@
 
 - 当日峰值会话 credit 记为 `top_cr`，阈值 `ratio_threshold = top_cr / 50`。
 - **只显示 credit ≥ 阈值的会话**；其余（零积分 + 不足峰值 1/50 的小额）不进拆解表。
-- 目的：峰值与最小显示值差距 ≤ 50 倍，自动隐去个位数等噪音（例：6/18 峰值 1130.78，阈值 22.62 → `美团优惠券`3.75 / `安装skill`3.25 / `公众号爬虫`1.64 全部隐去，`Cloud solution` 345.57 保留）。
+- 目的：峰值与最小显示值差距 ≤ 50 倍，自动隐去个位数等噪音。
 - 被隐去的会在卡片底部说明一行：`另有 N 个零积分会话 + M 个不足峰值 1/50 的小额会话……未列入上表`。
 
 ---

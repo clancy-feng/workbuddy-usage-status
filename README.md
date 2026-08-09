@@ -2,11 +2,9 @@
 
 > **Skill Overview**
 > 
-> 
-> 
 > WorkBuddy Usage Status turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. It ranks **model cost-performance (credit per 1k tokens) with switching suggestions** so you can pick the cheapest model, and now supports a **date-range filter** so you can zoom into any period. All model-share charts are limited to the top 10 models with the rest grouped as "Other". All data stays on your machine under `~/.workbuddy/`; no network, no external APIs. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies.
 > 
-> **Key Search Keywords (EN)**: AI cost monitoring, agent usage tracking, token consumption analytics, credit burn rate tracker, WorkBuddy telemetry, offline AI usage dashboard.
+> **Key Search Keywords (EN)**: WorkBuddy usage stats, token consumption, thinking efficiency, credit consumption tracking, usage control, agent usage, workbuddy /cost, filter date range, which day used most, usage spike, usage peak — WorkBuddy's own usage context only.
 > 
 > **How to install**
 > 
@@ -18,7 +16,7 @@
 > 
 > - **Chat trigger:**​ say any of these in a WorkBuddy conversation and the skill is auto-detected:
 >   
->   "workbuddy usage stats" / "telemetry" / "usage" / "token consumption" / "thinking efficiency" / "model cost" / "cost control" / "how much has workbuddy used" / "AI cost monitoring" / "agent usage tracking" / "credit burn rate" / "which model is cheapest" / "model cost performance" / "filter date range".
+>   "workbuddy usage stats" / "token consumption" / "thinking efficiency" / "usage control" / "how much has workbuddy used" / "AI cost monitoring" / "agent usage" / "credit consumption tracking" / "workbuddy /cost" / "filter date range" / "which day used most" / "usage spike" / "usage peak" / "which day highest credit" / "usage surge" — WorkBuddy's own usage context only.
 > 
 > - **CLI:**​ `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`). Python 3.10+, standard library only. Windows users please replace `python3` with `python`.
 > 
@@ -98,15 +96,15 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 在 WorkBuddy 对话里直接说下面任意一句，skill 会被自动识别并引导生成看板：
 
-- “workbuddy 使用统计” / “telemetry” / “usage”
+- “workbuddy 使用统计” / “token 消耗” / “思考效率”
 
-- “token 消耗看板” / “思考效率” / “模型成本”
+- “用量控制” / “workbuddy 自己用了多少” / “AI 成本监控”
 
-- “使用监督” / “用量控制” / “workbuddy 自己用了多少”
+- “agent 用量” / “credit 消耗追踪” / “workbuddy /cost”
 
-- “会话耗时” / “workbuddy /cost” / “用了多少额度” / “烧了多少钱”
+- “筛选日期” / “哪天用最多” / “用量峰值”
 
-- “AI 成本监控” / “agent 用量统计” / “credit 消耗追踪”
+- “用量高峰” / “哪天积分最高” / “用量飙升”
 
 ### 入口 B：命令行直接跑
 

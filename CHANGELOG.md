@@ -46,10 +46,7 @@
 - 读取范围披露：`SKILL.md` 隐私声明新增 `--home` 旗标说明——默认仅读取 `~/.workbuddy/`，该旗标可指向其他目录（仅用于迁移/测试），仍只读取其下的 `workbuddy.db` 与 `traces/`。
 - 触发词收窄：删除 description 中与 WorkBuddy 用量无关、易误触发的泛财务短语（'telemetry' / '用了多少额度' / '烧了多少钱' / '哪个模型最省' / '模型性价比'），保留 WorkBuddy 命名空间内的精确触发词。
 
-### 数据归因方法
-
-- 改用 `sessions.model`（真实模型名）× `session_usage.used`（会话总 credit）× 会话总 token，在**会话级**计算，绕开原 `credit_json` 哈希死路（实测哈希无法反解为模型名）。
-- `credit` 来自 `session_usage.used`，已含 WorkBuddy 内部倍率 / 折扣 / 限免，skill 不做二次换算。
+# 
 
 ### 已知限制
 
