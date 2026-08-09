@@ -1,7 +1,7 @@
 ---
 name: "workbuddy-usage-status"
 version: 1.1.0
-description: "离线可视化 WorkBuddy 本地使用数据：token 消耗、credit 消耗、思考效率、模型分布、模型性价比(credit/千token)排名与切换建议、日期区间筛选、错误监控、用量高峰探查(自动定位 credit 最高的几天并拆解主导会话/模型构成/错误率)。当用户提到 'workbuddy 使用统计' '用量控制' '思考效率' 'token 消耗' 'workbuddy 自己用了多少' 'AI 成本监控' 'agent 用量' 'credit 消耗追踪' 'workbuddy /cost' '筛选日期' '哪天用最多' '用量峰值' '用量高峰' '哪天积分最高' '用量飙升' 时触发（仅限 WorkBuddy 自身用量语境）。纯本地、零外网依赖、可搬运。"
+description: "离线可视化 WorkBuddy 本机使用数据（token / credit 消耗、思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。当用户想查看、生成或导出 WorkBuddy 使用状态 / 使用统计 / 工作信息看板时调用。纯本地、零外网依赖、可搬运。"
 agent_created: true
 allowed-tools: python3, read_file, write_file
 metadata:

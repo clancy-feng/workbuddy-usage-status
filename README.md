@@ -4,7 +4,7 @@
 > 
 > WorkBuddy Usage Status turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. It ranks **model cost-performance (credit per 1k tokens) with switching suggestions** so you can pick the cheapest model, and now supports a **date-range filter** so you can zoom into any period. All model-share charts are limited to the top 10 models with the rest grouped as "Other". All data stays on your machine under `~/.workbuddy/`; no network, no external APIs. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies.
 > 
-> **Key Search Keywords (EN)**: WorkBuddy usage stats, token consumption, thinking efficiency, credit consumption tracking, usage control, agent usage, workbuddy /cost, filter date range, which day used most, usage spike, usage peak — WorkBuddy's own usage context only.
+> **What it does**: Offline dashboard for WorkBuddy's local usage data — token / credit consumption, thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, and usage-spike analysis. Purely local, zero network dependency.
 > 
 > **How to install**
 > 
@@ -94,17 +94,13 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 ### 入口 A：对话触发（推荐，最省事）
 
-在 WorkBuddy 对话里直接说下面任意一句，skill 会被自动识别并引导生成看板：
+在 WorkBuddy 对话里用自然语言描述你的需求即可，skill 会根据语义自动识别并引导生成看板。例如：
 
-- “workbuddy 使用统计” / “token 消耗” / “思考效率”
+- “生成一个 WorkBuddy 使用信息看板”
 
-- “用量控制” / “workbuddy 自己用了多少” / “AI 成本监控”
+- “查看一下最近 workbuddy 的使用状态”
 
-- “agent 用量” / “credit 消耗追踪” / “workbuddy /cost”
-
-- “筛选日期” / “哪天用最多” / “用量峰值”
-
-- “用量高峰” / “哪天积分最高” / “用量飙升”
+- “我想看看 workbuddy 的工作信息看板，包括 token 消耗和模型分布”
 
 ### 入口 B：命令行直接跑
 

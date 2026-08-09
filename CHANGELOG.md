@@ -44,7 +44,7 @@
 
 - 内联数据转义：dashboard HTML 内联的 `window.USAGE_STATUS` 现在对 `</` 做 `<\/` 转义，防止会话标题/模型名中的 `</script>` 冲破 script 边界（本地存储型 XSS 防护）。
 - 读取范围披露：`SKILL.md` 隐私声明新增 `--home` 旗标说明——默认仅读取 `~/.workbuddy/`，该旗标可指向其他目录（仅用于迁移/测试），仍只读取其下的 `workbuddy.db` 与 `traces/`。
-- 触发词收窄：删除 description 中与 WorkBuddy 用量无关、易误触发的泛财务短语（'telemetry' / '用了多少额度' / '烧了多少钱' / '哪个模型最省' / '模型性价比'），保留 WorkBuddy 命名空间内的精确触发词。
+- description 重写为自然语言描述（供调度/搜索索引，非关键词白名单）：删除原先堆砌的精确触发短语与"当用户提到…时触发"措辞，改为简洁的目的说明，自然语言请求（如"生成 workbuddy 使用信息看板"）即可命中。
 
 # 
 
