@@ -14,9 +14,11 @@
 > 
 > **How to invoke**
 > 
-> - **Chat trigger:**​ say any of these in a WorkBuddy conversation and the skill is auto-detected:
+> - **Chat trigger (natural language):** Describe what you want in plain English or Chinese — WorkBuddy detects this skill by *meaning*, not a fixed keyword list. Anything expressing *viewing, generating, or exporting your WorkBuddy usage status / stats / activity dashboard* will trigger it. Examples:
 >   
->   "workbuddy usage stats" / "token consumption" / "thinking efficiency" / "usage control" / "how much has workbuddy used" / "AI cost monitoring" / "agent usage" / "credit consumption tracking" / "workbuddy /cost" / "filter date range" / "which day used most" / "usage spike" / "usage peak" / "which day highest credit" / "usage surge" — WorkBuddy's own usage context only.
+>   "generate a WorkBuddy usage dashboard" · "view my recent WorkBuddy usage status" · "show token / credit consumption and model distribution" · "which model is the most cost-effective" · "filter usage by date range" · "which day had the highest usage"
+>   
+>   Scope is limited to WorkBuddy's own local usage data.
 > 
 > - **CLI:**​ `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`). Python 3.10+, standard library only. Windows users please replace `python3` with `python`.
 > 
@@ -28,7 +30,7 @@
 
 可以看到：token 消耗、思考用时、思考效率、模型分布、错误数、credit 消耗。
 
-## ✨ 核心功能特性（覆盖高搜索量关键词）
+## ✨ 核心功能特性
 
 - **Token/Credit 全链路可视化**：按模型、按日期、按会话统计，一眼定位“烧钱大户”
 
@@ -82,11 +84,11 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 ---
 
-## 3. 怎么用（两种入口）
+## 3. 怎么用
 
 装好 skill（见第 2 节）并重启 WorkBuddy 后，有两种用法。
 
-### 入口 A：对话触发（推荐，最省事）
+### 入口 A：对话触发
 
 在 WorkBuddy 对话里用自然语言描述你的需求即可，skill 会根据语义自动识别并引导生成看板。例如：
 
@@ -172,7 +174,7 @@ python3 scripts/usage_extractor.py --out ./report
 
 ---
 
-## 8. 适用使用场景（覆盖高搜索量关键词）
+## 8. 适用使用场景
 
 - **AI 工具成本管控**：监控 WorkBuddy 的 token/credit 消耗，避免预算超支
 
