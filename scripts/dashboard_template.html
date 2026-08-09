@@ -106,7 +106,12 @@
 <script>
 const T = window.USAGE_STATUS;
 const charts = [];
-let LANG = (function(){ try { return localStorage.getItem('wb_lang') || 'zh'; } catch(e){ return 'zh'; } })();
+function detectLang(){
+  try { var s = localStorage.getItem('wb_lang'); if (s) return s; } catch(e){}
+  var nav = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language.toLowerCase() : '';
+  return nav.indexOf('zh') === 0 ? 'zh' : 'en';
+}
+let LANG = detectLang();
 
 const I18N = {
   zh: {

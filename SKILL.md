@@ -1,7 +1,7 @@
 ---
 name: "workbuddy-usage-status"
 version: 1.1.0
-description: "离线可视化 WorkBuddy 本机使用数据（token / credit 消耗、思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。当用户想查看、生成或导出 WorkBuddy 使用状态 / 使用统计 / 工作信息看板时调用。纯本地、零外网依赖、可搬运。"
+description: "离线可视化 WorkBuddy 本机使用数据（token / credit 消耗、思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。当用户想查看、生成或导出 WorkBuddy 使用状态 / 使用统计 / 工作信息看板时调用。纯本地、零外网依赖、可搬运。 EN: Offline dashboard for WorkBuddy local usage analytics (token / credit consumption, thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection). Triggers when the user wants to view, generate, or export their WorkBuddy usage status / stats / activity dashboard. Fully local, zero network dependency, portable."
 agent_created: true
 allowed-tools: python3, read_file, write_file
 metadata:
@@ -62,7 +62,7 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 ## 已知限制
 
-1. 模型级 credit 性价比已通过关联 `sessions.model`（会话选模字段）实现，credit 不再依赖 `credit_json` 的哈希（哈希无法反解名称，已绕过）。用量统计以「有效 trace」（有实际 token 消耗的 trace）为基数：agent 框架另产生的零 token 工作流记账记录（不绑定会话、不含用量）属于噪声，已排除在统计之外；在有效 trace 上，`sessionId` 与 `sessions` 表 **100% 对应**，所有真实用量都能精确归到会话，无覆盖率缺口。`'auto'` 表示会话未锁定具体模型，性价比排行中排除。credit 值来自 `session_usage.credit_json`（会话级汇总），已包含 WorkBuddy 内部倍率/折扣/限免；本 skill 只做读取和聚合，不做二次换算。
+1. 模型级 credit 性价比已通过关联 `sessions.model`（会话选模字段）实现，用量统计以「有效 trace」（有实际 token 消耗的 trace）为基数。credit 值来自 `session_usage.credit_json`（会话级汇总），已包含 WorkBuddy 内部倍率/折扣/限免；本 skill 只做读取和聚合，不做二次换算。
 2. 当前为**快照式**：手动/定时跑脚本生成，要实时监督需包成常驻服务。
 3. 解析全量 traces（可能上千文件、上 GB）约需 10–30 秒，属一次性开销。
 
