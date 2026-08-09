@@ -1,0 +1,50 @@
+name: 🐛 Bug 报告
+description: 报告一个技能运行中的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰简洁地描述你遇到的问题
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 一步步描述如何复现这个问题
+      placeholder: |
+        1. 执行 python3 scripts/telemetry_extractor.py
+        2. 报错信息：
+        3. 生成的 HTML 表现：
+    validations:
+      required: true
+  - type: input
+    id: workbuddy-version
+    attributes:
+      label: WorkBuddy 版本
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统
+      placeholder: Windows 11 / macOS 14 / Ubuntu 22.04
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python 版本
+      placeholder: 3.10.11
+    validations:
+      required: true
+  - type: input
+    id: skill-version
+    attributes:
+      label: Skill 版本
+      placeholder: v1.0.0
+    validations:
+      required: true

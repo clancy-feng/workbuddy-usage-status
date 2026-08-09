@@ -1,9 +1,16 @@
 ---
 name: "workbuddy-usage-status"
-version: 1.0.0
-description: "一款把 WorkBuddy 的运行数据可视化的技能。当用户提到“workbuddy 使用统计”“用量控制”“思考效率”“token 消耗”“telemetry”“workbuddy 自己用了多少”等关键词时触发。纯本地、零外部接口、可搬运到其他装了 WorkBuddy 的机器。"
+version: 1.1.0
+description: "离线可视化 WorkBuddy 本地使用数据：token 消耗、credit 消耗、思考效率、模型分布、模型性价比(credit/千token)排名与切换建议、日期区间筛选、错误监控、用量高峰探查(自动定位 credit 最高的几天并拆解主导会话/模型构成/错误率)。当用户提到 'workbuddy 使用统计' '用量控制' '思考效率' 'token 消耗' 'telemetry' 'workbuddy 自己用了多少' 'AI 成本监控' 'agent 用量' 'credit 消耗追踪' 'workbuddy /cost' '用了多少额度' '烧了多少钱' '哪个模型最省' '模型性价比' '筛选日期' '哪天用最多' '用量峰值' '用量高峰' '哪天积分最高' '用量飙升' 时触发。纯本地、零外网依赖、可搬运。"
 agent_created: true
 allowed-tools: python3, read_file, write_file
+metadata:
+  clawdbot:
+    emoji: "📊"
+    requires:
+      bins:
+        - python3
+    requires.env: []
 ---
 
 # WorkBuddy Usage Status
@@ -22,28 +29,32 @@ allowed-tools: python3, read_file, write_file
 | 来源                                            | 内容                                                                                          | 对应指标                            |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- |
 | `~/.workbuddy/workbuddy.db` → `sessions`      | 会话标题、模型、状态、创建/更新时间                                                                          | 按会话/项目归集                        |
-| `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(按模型哈希拆分的 credit 消耗)                            | token 消耗 / 费用                   |
+| `~/.workbuddy/workbuddy.db` → `session_usage` | `used`(token 预算)、`size`(上下文上限)、`credit_json`(会话级 credit 消耗汇总)                            | token 消耗 / 费用 / 模型级 credit 性价比（关联 sessions.model）                   |
 | `~/.workbuddy/traces/*/trace_*.json`          | 每次请求的 `duration`、token 拆分(input/output/cached)、`callCount`、`modelInfo.models`，以及 `spans` 时序 | **思考用时**、**思考效率**、模型分布、工具调用、错误数 |
+
+## 如何安装
+
+#### 方式一：通过 WorkBuddy 对话安装
+
+把 SkillHub 提供的 prompt 发给你的 WorkBuddy 即可：
+请根据 https://skillhub.cn/install/skillhub.md ，安装 workbuddy-usage-status。
+
+### 方式二：通过 Clawhub 安装
+
+clawhub install workbuddy-usage-status
+
+#### 方式三：手动安装到本地
+
+git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/skills/workbuddy-usage-status
 
 ## 用法
 
-```bash
-# 默认：把 dashboard 生成到“当前工作目录”
-python3 scripts/usage_extractor.py
-
-# 指定输出目录
-python3 scripts/usage_extractor.py --out /path/to/out
-
-# 指定 WorkBuddy 数据根（一般不用，默认 ~/.workbuddy）
-python3 scripts/usage_extractor.py --home /other/.workbuddy
-```
-
-运行后会在输出目录生成 3 个文件，直接打开 `workbuddy-usage-status-dashboard.html` 即可：
+装好后，在 WorkBuddy 对话里说"workbuddy 使用统计"，或命令行跑 `python3 scripts/usage_extractor.py`，运行后会在输出目录生成 3 个文件，直接打开 `workbuddy-usage-status-dashboard.html` 即可：
 
 - `workbuddy-usage-status-dashboard.html` —— **自包含单文件**，数据 + Chart.js 均已内联，双击/预览即可看，零外网依赖
 - `usage-status.json` / `usage-status.js` —— 原始聚合数据，供二次处理
 
-## 指标定义（务必先讲清楚再展示）
+## 指标定义
 
 - **思考用时**：每条 trace 里 `type=generation` 的 span 时长之和（模型推理/思考的代理指标，单位秒/小时）
 - **思考效率**：输出 token ÷ 思考秒数（tok/s，越高越“省时”）
@@ -52,7 +63,7 @@ python3 scripts/usage_extractor.py --home /other/.workbuddy
 
 ## 已知限制
 
-1. `session_usage.credit_json` 的 key 是**模型哈希**，WorkBuddy 未提供哈希→名称映射，故 credit 只能到**会话级**；token 可按真实模型名（`trace.modelInfo.models`）拆分。
+1. 模型级 credit 性价比已通过关联 `sessions.model`（会话选模字段）实现，credit 不再依赖 `credit_json` 的哈希（哈希无法反解名称，已绕过）。限制：约 44% 的 trace 含 `sessionId` 可归因到具体会话/模型，其余（多为 `auto`/旧格式）归入 `unknown`；`auto` 表示会话未锁定具体模型。credit 值来自 `session_usage.used`，已包含 WorkBuddy 内部倍率/折扣/限免；本 skill 只做读取和聚合，不做二次换算。
 2. 当前为**快照式**：手动/定时跑脚本生成。要实时监督需包成常驻服务。
 3. Dashboard 已彻底离线：Chart.js 随包内联进 HTML，零外网依赖，预览/双击均可正常出图。`chart.umd.min.js` 为发布版必带文件，抽取器强依赖它；缺失则脚本直接报错退出，不回退 CDN。
 4. 解析全量 traces（可能上千文件、上 GB）约需 10–30 秒，属一次性开销。

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>WorkBuddy 使用状态 Dashboard</title>
+<title>Workbuddy使用数据看板</title>
 <!--CHART_JS-->
 <style>
   :root{
@@ -14,10 +14,18 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
-  header{padding:20px 28px;border-bottom:1px solid var(--border);background:var(--panel);}
+  header{padding:20px 28px;border-bottom:1px solid var(--border);background:var(--panel);position:relative;}
   header h1{margin:0;font-size:20px;font-weight:600;}
   header .sub{color:var(--muted);font-size:12px;margin-top:6px;}
+  header .lang-toggle{position:absolute;top:20px;right:28px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--text);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;}
+  header .lang-toggle:hover{border-color:var(--accent);}
   .wrap{padding:22px 28px;max-width:1400px;margin:0 auto;}
+  .filter-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
+  .filter-bar label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .filter-bar input[type=date]{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;}
+  .filter-bar button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
+  .filter-bar button:hover{opacity:.9;}
   .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px;}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
   .kpi .label{color:var(--muted);font-size:12px;}
@@ -37,30 +45,58 @@
   .note{color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px;}
   .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);font-size:11px;}
   .err{color:var(--red);}
+  .zero-credit{color:var(--yellow);font-size:11px;margin-left:6px;}
+  .spike-day{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:var(--panel2);}
+  .spike-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .spike-date{font-size:15px;font-weight:700;color:var(--text);}
+  .spike-credit{font-size:15px;font-weight:700;color:var(--yellow);margin-right:6px;}
+  .spike-body{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;}
+  .spike-col{min-width:0;}
+  .spike-sub{color:var(--muted);font-size:11px;margin-bottom:6px;}
+  @media(max-width:1000px){.spike-body{grid-template-columns:1fr}}
   @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header>
-  <h1>WorkBuddy 使用状态 Dashboard</h1>
+  <h1 data-i18n="title">Workbuddy使用数据看板</h1>
   <div class="sub" id="sub">加载中…</div>
+  <button class="lang-toggle" id="langToggle">EN</button>
 </header>
 <div class="wrap" id="app" style="display:none">
+  <div class="filter-bar">
+    <label data-i18n="start">起始日期 <input type="date" id="startDate"></label>
+    <label data-i18n="end">结束日期 <input type="date" id="endDate"></label>
+    <button id="resetDate" data-i18n="update">更新</button>
+  </div>
+
   <div class="kpis" id="kpis"></div>
 
   <div class="grid">
-    <div class="card"><h3>每日积分消耗（credit）</h3><div class="hint">按天聚合的 session_usage credit 消耗（会话级，归因到会话首次出现日）</div><canvas id="cDailyTokens"></canvas></div>
-    <div class="card"><h3>每日思考用时</h3><div class="hint">generation span 时长之和，单位小时（模型推理/思考的代理指标）</div><canvas id="cDailyThink"></canvas></div>
-    <div class="card"><h3>各模型 Token 占比</h3><div class="hint">按模型名称聚合（来自 trace.modelInfo）</div><canvas id="cModelShare"></canvas></div>
-    <div class="card"><h3>各模型思考效率</h3><div class="hint">输出 token / 思考秒数，越高越“省时”</div><canvas id="cModelEff"></canvas></div>
-    <div class="card full"><h3>思考效率散点：思考用时 × 输出 token</h3><div class="hint">每个点=一次请求；右下方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
-    <div class="card full"><h3>Top 会话（按 token 消耗）</h3><div class="hint">会话标题 + 模型 + 思考用时 + credit 消耗</div>
+    <div class="card"><h3 data-i18n="cardDailyCredit">每日积分消耗（credit）</h3><canvas id="cDailyTokens"></canvas></div>
+    <div class="card"><h3 data-i18n="cardDailyThink">每日思考用时（小时）</h3><canvas id="cDailyThink"></canvas></div>
+    <div class="card"><h3 data-i18n="cardModelShare">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare"></canvas></div>
+    <div class="card"><h3 data-i18n="cardModelEff">各模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数，越高越“省时”</div><canvas id="cModelEff"></canvas></div>
+    <div class="card full"><h3 data-i18n="cardScatter">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter">每个点=一次请求；右下方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
+    <div class="card full"><h3 data-i18n="cardTopSessions">Top 10 会话</h3><div class="hint" data-i18n="hintTopSessions">会话标题 + 模型 + 思考用时 + credit 消耗</div>
       <div class="tbl-scroll"><table id="tSessions"><thead><tr>
-        <th>会话标题</th><th>模型</th><th class="num">请求数</th><th class="num">Token</th>
-        <th class="num">思考(分)</th><th class="num">Credit</th><th class="num">错误</th><th>状态</th>
+        <th data-i18n="thSession">会话标题</th><th data-i18n="thModel">模型</th><th class="num" data-i18n="thReq">请求数</th><th class="num" data-i18n="thToken">Token</th>
+        <th class="num" data-i18n="thThink">思考(分)</th><th class="num" data-i18n="thCredit">Credit</th><th class="num" data-i18n="thErr">错误</th><th data-i18n="thStatus">状态</th>
       </tr></thead><tbody></tbody></table></div>
     </div>
-    <div class="card full"><h3>每日错误数</h3><div class="hint">span 级 status=error 的计数</div><canvas id="cErrors"></canvas></div>
+    <div class="card full" id="spikeCard">
+      <h3 data-i18n="cardSpike">用量高峰探查（自动定位明显高的使用日）</h3>
+      <div class="hint" data-i18n="hintSpike">按 credit 排序列出最高的几天，分析：主导会话、模型 token 构成、错误率、最大单次请求。</div>
+      <div id="spikeDays"></div>
+    </div>
+    <div class="card full"><h3 data-i18n="cardCost">模型性价比排行（credit / 千 token）</h3><div class="hint" data-i18n="hintCost">按模型聚合 credit 与 token；数值越低性价比越高。</div>
+      <div class="tbl-scroll"><table id="tModelCost"><thead><tr>
+        <th data-i18n="thModel2">模型</th><th class="num" data-i18n="thSessions">会话数</th><th class="num" data-i18n="thTotalToken">总 Token</th>
+        <th class="num" data-i18n="thTotalCredit">总 Credit</th><th class="num" data-i18n="thCostPer1k">Credit / 1k token</th>
+      </tr></thead><tbody></tbody></table></div>
+      <div class="note" id="modelTips"></div>
+    </div>
+    <div class="card full"><h3 data-i18n="cardErrors">每日错误数</h3><div class="hint" data-i18n="hintErrors">span 级 status=error 的计数</div><canvas id="cErrors"></canvas></div>
   </div>
 
   <div class="note" id="note"></div>
@@ -69,77 +105,242 @@
 <!--USAGE_DATA-->
 <script>
 const T = window.USAGE_STATUS;
+const charts = [];
+let LANG = (function(){ try { return localStorage.getItem('wb_lang') || 'zh'; } catch(e){ return 'zh'; } })();
+
+const I18N = {
+  zh: {
+    title: "Workbuddy使用数据看板",
+    subGenerated: "生成时间", subRange: "数据范围", subFilter: "筛选范围", subReq: "请求", subSess: "会话", subModel: "模型",
+    start: "起始日期", end: "结束日期", update: "更新",
+    kpiRequests: "总请求数", kpiToken: "总 Token", kpiCredit: "总 Credit", kpiThink: "思考用时", kpiEff: "平均效率", kpiErr: "错误数",
+    unitHour: "小时", unitTokS: "tok/s",
+    cardDailyCredit: "每日积分消耗（credit）", cardDailyThink: "每日思考用时（小时）",
+    cardModelShare: "各模型 Token 占比", cardModelEff: "各模型思考效率",
+    cardScatter: "思考效率散点：思考用时 × 输出 token", cardTopSessions: "Top 10 会话",
+    cardSpike: "用量高峰探查（自动定位明显高的使用日）", cardCost: "模型性价比排行（credit / 千 token）",
+    cardErrors: "每日错误数",
+    hintModelShare: "按模型名称聚合，Top10 之外合并为「其他」",
+    hintModelEff: "输出 token / 思考秒数，越高越“省时”",
+    hintScatter: "每个点=一次请求；右下方=高产出低耗时=高效率",
+    hintTopSessions: "会话标题 + 模型 + 思考用时 + credit 消耗",
+    hintSpike: "按 credit 排序列出最高的几天，分析：主导会话、模型 token 构成、错误率、最大单次请求。",
+    hintCost: "按模型聚合 credit 与 token；数值越低性价比越高。",
+    hintErrors: "span 级 status=error 的计数",
+    thSession: "会话标题", thModel: "模型", thReq: "请求数", thToken: "Token",
+    thThink: "思考(分)", thCredit: "Credit", thErr: "错误", thStatus: "状态",
+    thModel2: "模型", thSessions: "会话数", thTotalToken: "总 Token", thTotalCredit: "总 Credit", thCostPer1k: "Credit / 1k token",
+    tipOptimize: (c,cv,p,pv,s)=>`优化建议：在可比任务量下，切换至「${c}」(credit/1k=${cv}) 相比「${p}」(credit/1k=${pv}) 预计节省约 ${s}% credit。`,
+    tipPromo: (m)=>`提示：「${m}」当前 credit/1k=0，可能处于限免/促销期，不建议作为长期成本基准。`,
+    tipNoModel: "提示：当前筛选范围内可比模型样本不足，暂无可生成的切换建议；或多数会话为 auto / unknown。",
+    emptyCost: "无模型级数据（trace 均未携带 sessionId）",
+    bottomNote: "报告数据说明见 data-guide.md",
+    spikeNoData: "无显著高用量日。",
+    spikeSubSessions: "主导会话（按当日 credit）", spikeSubModel: "模型 token 构成（Top5）",
+    spikeNone: "无",
+    spikeHidden: (z,s)=>`另有 ${z} 个零积分会话 + ${s} 个不足峰值 1/50 的小额会话，未列入上表。`,
+    spikeCredit: "credit", spikeReq: "请求", spikeSess: "会话", spikeErrRate: "错误率", spikeAvgCalls: "均 calls/请求", spikeMaxReq: "最大单请求",
+    scatterModel: "模型", scatterThink: "思考", scatterOutput: "输出",
+    xThink: "思考用时(秒)", yOutput: "输出 token",
+    dsCredit: "Credit", dsThink: "思考(小时)", dsErr: "错误", dsTokS: "tok/s", dsReq: "请求",
+    lang: "EN",
+  },
+  en: {
+    title: "WorkBuddy Usage Data Dashboard",
+    subGenerated: "Generated", subRange: "Range", subFilter: "Filtered", subReq: "reqs", subSess: "sessions", subModel: "models",
+    start: "Start date", end: "End date", update: "Update",
+    kpiRequests: "Total Requests", kpiToken: "Total Token", kpiCredit: "Total Credit", kpiThink: "Thinking Time", kpiEff: "Avg Efficiency", kpiErr: "Errors",
+    unitHour: "h", unitTokS: "tok/s",
+    cardDailyCredit: "Daily Credit", cardDailyThink: "Daily Thinking Time (hours)",
+    cardModelShare: "Token Share by Model", cardModelEff: "Thinking Efficiency by Model",
+    cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
+    cardSpike: "Usage Spike Explorer (auto-detect notable high-usage days)", cardCost: "Model Cost Efficiency (credit / 1k token)",
+    cardErrors: "Daily Errors",
+    hintModelShare: "Aggregated by model name; Top10 merged into “Others”.",
+    hintModelEff: "output token / think seconds; higher = more “time-saving”.",
+    hintScatter: "Each point = one request; bottom-right = high output, low time = efficient.",
+    hintTopSessions: "Session title + model + think time + credit.",
+    hintSpike: "Days sorted by credit, highest first; breakdown: top sessions, model token mix, error rate, largest single request.",
+    hintCost: "Aggregated credit & token by model; lower = better cost efficiency.",
+    hintErrors: "Count of spans with status=error.",
+    thSession: "Session", thModel: "Model", thReq: "Requests", thToken: "Token",
+    thThink: "Think(min)", thCredit: "Credit", thErr: "Err", thStatus: "Status",
+    thModel2: "Model", thSessions: "Sessions", thTotalToken: "Total Token", thTotalCredit: "Total Credit", thCostPer1k: "Credit / 1k token",
+    tipOptimize: (c,cv,p,pv,s)=>`Tip: for comparable workloads, switching to "${c}" (credit/1k=${cv}) vs "${p}" (credit/1k=${pv}) could save ~${s}% credit.`,
+    tipPromo: (m)=>`Note: "${m}" current credit/1k=0, likely in free/promo period; not a reliable long-term cost baseline.`,
+    tipNoModel: "Note: insufficient comparable models in current range, or most sessions are auto / unknown.",
+    emptyCost: "No model-level data (traces lack sessionId).",
+    bottomNote: "See data-guide.md for data definitions.",
+    spikeNoData: "No notable high-usage days.",
+    spikeSubSessions: "Top Sessions (by daily credit)", spikeSubModel: "Model Token Mix (Top5)",
+    spikeNone: "None",
+    spikeHidden: (z,s)=>`${z} zero-credit sessions + ${s} small sessions below 1/50 of peak are hidden from the table.`,
+    spikeCredit: "credit", spikeReq: "reqs", spikeSess: "sess", spikeErrRate: "err", spikeAvgCalls: "avg calls/req", spikeMaxReq: "max req",
+    scatterModel: "Model", scatterThink: "Think", scatterOutput: "Output",
+    xThink: "Think time (s)", yOutput: "Output token",
+    dsCredit: "Credit", dsThink: "Think(h)", dsErr: "Errors", dsTokS: "tok/s", dsReq: "reqs",
+    lang: "中",
+  }
+};
+
+function t(k){ const d = I18N[LANG] || I18N.zh; return (d[k] !== undefined) ? d[k] : I18N.zh[k]; }
+
+function applyStaticLang(){
+  document.documentElement.lang = (LANG === 'en') ? 'en' : 'zh-CN';
+  document.title = t('title');
+  document.getElementById('langToggle').textContent = t('lang');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k = el.getAttribute('data-i18n');
+    // 含 input 元素的 label 不覆盖其内容，仅标记（此处无此情形，保留通用逻辑）
+    el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
+    el.prepend(document.createTextNode(t(k)));
+  });
+}
+
+function getCurRange(){
+  const startEl = document.getElementById('startDate');
+  const endEl = document.getElementById('endDate');
+  return [startEl.value, endEl.value];
+}
+
 if(!T){ document.getElementById('sub').textContent='数据未加载：请重新运行 usage_extractor.py 生成自包含仪表盘。'; }
-else { render(); }
+else { init(); }
 
 function fmt(n){ return (n||0).toLocaleString('en-US'); }
 function short(n){ if(n>=1e9)return (n/1e9).toFixed(2)+'B'; if(n>=1e6)return (n/1e6).toFixed(2)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'K'; return ''+n; }
+function esc(s){return (''+s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function dateMinMax(){
+  const ds = T.by_day.map(d=>d.date).sort();
+  return [ds[0]||'', ds[ds.length-1]||''];
+}
+function destroyCharts(){ charts.forEach(c=>c.destroy()); charts.length=0; }
+function between(v, lo, hi){ return (!lo||v>=lo) && (!hi||v<=hi); }
 
-function render(){
+function init(){
+  const [minD, maxD] = dateMinMax();
+  const startEl = document.getElementById('startDate');
+  const endEl = document.getElementById('endDate');
+  startEl.value = minD; endEl.value = maxD;
+  startEl.min = minD; startEl.max = maxD;
+  endEl.min = minD; endEl.max = maxD;
+  document.getElementById('resetDate').addEventListener('click',()=>{
+    startEl.value = minD; endEl.value = maxD; render(minD, maxD);
+  });
+  startEl.addEventListener('change',()=>{
+    if(startEl.value>endEl.value) endEl.value=startEl.value;
+    render(startEl.value, endEl.value);
+  });
+  endEl.addEventListener('change',()=>{
+    if(endEl.value<startEl.value) startEl.value=endEl.value;
+    render(startEl.value, endEl.value);
+  });
+  document.getElementById('langToggle').addEventListener('click',()=>{
+    LANG = (LANG === 'zh') ? 'en' : 'zh';
+    try { localStorage.setItem('wb_lang', LANG); } catch(e){}
+    const [s,e] = getCurRange();
+    applyStaticLang();
+    render(s,e);
+  });
+  applyStaticLang();
+  render(minD, maxD);
+}
+
+function render(start, end){
   const s=T.summary;
+  const hasFilter = start && end && (start!==dateMinMax()[0] || end!==dateMinMax()[1]);
+  const inRange = d => between(d, start, end);
+
+  // 按日期筛选后的会话、请求
+  const sessFilt = T.by_session.filter(sb => inRange(sb.first_date));
+  const reqFilt = (T.requests_slim||[]).filter(r => inRange(r.date));
+
+  // KPI 从筛选后的会话重算
+  const kpi = sessFilt.reduce((acc, sb)=>{
+    acc.requests += sb.requests||0;
+    acc.tokens += sb.tokens||0;
+    acc.thinking_sec += sb.thinking_sec||0;
+    acc.credit += sb.credit||0;
+    acc.errors += sb.errors||0;
+    return acc;
+  }, {requests:0, tokens:0, thinking_sec:0, credit:0, errors:0});
+  kpi.sessions = sessFilt.length;
+  kpi.thinking_hours = (kpi.thinking_sec/3600).toFixed(2);
+  kpi.eff = (kpi.thinking_sec>0) ? (kpi.output/kpi.thinking_sec).toFixed(1) : '0.0';
+  // output 在会话级没有，用筛选请求重算
+  kpi.output = reqFilt.reduce((a,r)=>a+(r.output||0),0);
+  kpi.eff = (kpi.thinking_sec>0) ? (kpi.output/kpi.thinking_sec).toFixed(1) : '0.0';
+
   document.getElementById('sub').innerHTML =
-    `生成时间 ${s.generated_at} ｜ 数据范围 ${s.date_min} ~ ${s.date_max} ｜ 请求 ${fmt(s.total_requests)} ｜ 会话 ${s.total_sessions} ｜ 模型 ${s.model_count}`;
+    `${t('subGenerated')} ${s.generated_at} ｜ ${hasFilter?t('subFilter'):t('subRange')} ${start} ~ ${end}` +
+    ` ｜ ${t('subReq')} ${fmt(kpi.requests)} ｜ ${t('subSess')} ${kpi.sessions} ｜ ${t('subModel')} ${s.model_count}`;
 
   const app=document.getElementById('app'); app.style.display='block';
   const kpis=[
-    {label:'总请求数',val:fmt(s.total_requests)},
-    {label:'总 Token',val:short(s.total_tokens),unit:fmt(s.total_tokens)},
-    {label:'思考用时',val:s.total_thinking_hours,unit:'小时'},
-    {label:'平均效率',val:s.avg_efficiency_tok_per_sec,unit:'tok/s'},
-    {label:'Credit 消耗',val:s.total_credit},
-    {label:'错误数',val:s.total_errors,err:s.total_errors>0},
+    {label:t('kpiRequests'),val:fmt(kpi.requests)},
+    {label:t('kpiToken'),val:short(kpi.tokens),unit:fmt(kpi.tokens)},
+    {label:t('kpiThink'),val:kpi.thinking_hours,unit:t('unitHour')},
+    {label:t('kpiEff'),val:kpi.eff,unit:t('unitTokS')},
+    {label:t('kpiCredit'),val:short(kpi.credit),unit:fmt(kpi.credit)},
+    {label:t('kpiErr'),val:fmt(kpi.errors),err:kpi.errors>0},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
     `<div class="kpi"><div class="label">${k.label}</div>
      <div class="val ${k.err?'err':''}">${k.val}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div></div>`).join('');
 
+  const dayFilt = T.by_day.filter(d => inRange(d.date));
+  const grid={color:'#2a2f3a'};
   Chart.defaults.color='#9aa3b2';
   Chart.defaults.borderColor='#333845';
   Chart.defaults.font.family='-apple-system,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif';
 
-  const grid={color:'#2a2f3a'};
-  // 每日 token
-  new Chart(cDailyTokens,{type:'line',data:{labels:T.by_day.map(d=>d.date),
-    datasets:[{label:'Credit',data:T.by_day.map(d=>d.credit),borderColor:'#4f9dff',
+  destroyCharts();
+
+  // 每日 credit
+  charts.push(new Chart(cDailyTokens,{type:'line',data:{labels:dayFilt.map(d=>d.date),
+    datasets:[{label:t('dsCredit'),data:dayFilt.map(d=>d.credit),borderColor:'#4f9dff',
       backgroundColor:'rgba(79,157,255,.15)',fill:true,tension:.3,pointRadius:2}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}});
+    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 每日思考用时(小时)
-  new Chart(cDailyThink,{type:'bar',data:{labels:T.by_day.map(d=>d.date),
-    datasets:[{label:'思考(小时)',data:T.by_day.map(d=>(d.thinking_sec/3600).toFixed(2)),
+  // 每日思考用时
+  charts.push(new Chart(cDailyThink,{type:'bar',data:{labels:dayFilt.map(d=>d.date),
+    datasets:[{label:t('dsThink'),data:dayFilt.map(d=>(d.thinking_sec/3600).toFixed(2)),
       backgroundColor:'#b58cff'}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}});
+    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
-  // 模型占比
-  new Chart(cModelShare,{type:'doughnut',data:{labels:T.by_model.map(m=>m.model),
-    datasets:[{data:T.by_model.map(m=>m.tokens),
-      backgroundColor:['#4f9dff','#3ecf8e','#ffcc66','#b58cff','#ff5c5c','#5ad1c4','#f0934f','#8ab4f8']}]},
-    options:{plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}}}});
+  // 模型占比 Top10 + 其他
+  const share = groupTokensByModel(reqFilt);
+  const topShare = top10others(share);
+  charts.push(new Chart(cModelShare,{type:'doughnut',data:{labels:topShare.labels,
+    datasets:[{data:topShare.data,
+      backgroundColor:['#4f9dff','#3ecf8e','#ffcc66','#b58cff','#ff5c5c','#5ad1c4','#f0934f','#8ab4f8','#7bed9f','#ff9ff3','#57606f']}]},
+    options:{plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}}}}));
 
-  // 模型效率
-  new Chart(cModelEff,{type:'bar',data:{labels:T.by_model.map(m=>m.model),
-    datasets:[{label:'tok/s',data:T.by_model.map(m=>m.efficiency_tok_per_sec),
+  // 模型效率 Top10（不含「其他」，避免合并后效率虚高）
+  const eff = groupEffByModel(reqFilt);
+  const topEff = topN(eff.map(m=>({key:m.model,val:m.efficiency})).filter(x=>x.val>0), 10);
+  charts.push(new Chart(cModelEff,{type:'bar',data:{labels:topEff.labels,
+    datasets:[{label:t('dsTokS'),data:topEff.data,
       backgroundColor:'#3ecf8e'}]},
-    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}});
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
   // 散点
-  const pts=T.requests_sample.map(r=>({x:+(r.thinking_sec).toFixed(1),y:r.output,
+  const pts=T.requests_sample.filter(r=>inRange(r.date)).map(r=>({x:+(r.thinking_sec).toFixed(1),y:r.output,
     m:r.model,t:r.tokens}));
-  new Chart(cScatter,{type:'scatter',data:{datasets:[{label:'请求',data:pts,
+  charts.push(new Chart(cScatter,{type:'scatter',data:{datasets:[{label:t('dsReq'),data:pts,
     backgroundColor:'rgba(79,157,255,.5)',pointRadius:4}]},
     options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>
-      `模型 ${c.raw.m} | 思考 ${c.raw.x}s | 输出 ${fmt(c.raw.y)} tok`}}},
-      scales:{x:{title:{display:true,text:'思考用时(秒)'},grid},
-        y:{title:{display:true,text:'输出 token'},grid,ticks:{callback:v=>short(v)}}}}});
+      `${t('scatterModel')} ${c.raw.m} | ${t('scatterThink')} ${c.raw.x}s | ${t('scatterOutput')} ${fmt(c.raw.y)} tok`}}},
+      scales:{x:{title:{display:true,text:t('xThink')},grid},
+        y:{title:{display:true,text:t('yOutput')},grid,ticks:{callback:v=>short(v)}}}}}));
 
   // 错误
-  new Chart(cErrors,{type:'bar',data:{labels:T.by_day.map(d=>d.date),
-    datasets:[{label:'错误',data:T.by_day.map(d=>d.errors),backgroundColor:'#ff5c5c'}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}});
+  charts.push(new Chart(cErrors,{type:'bar',data:{labels:dayFilt.map(d=>d.date),
+    datasets:[{label:t('dsErr'),data:dayFilt.map(d=>d.errors),backgroundColor:'#ff5c5c'}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
-  // 会话表
+  // Top 会话表
   const tb=document.querySelector('#tSessions tbody');
-  tb.innerHTML=T.by_session.slice(0,10).map(x=>`<tr>
+  tb.innerHTML=sessFilt.slice(0,10).map(x=>`<tr>
     <td>${esc(x.title||'(无标题)')}</td><td><span class="tag">${esc(x.models||'?')}</span></td>
     <td class="num">${x.requests}</td><td class="num">${fmt(x.tokens)}</td>
     <td class="num">${(x.thinking_sec/60).toFixed(1)}</td>
@@ -147,9 +348,137 @@ function render(){
     <td class="num ${x.errors?'err':''}">${x.errors}</td>
     <td>${x.status||''}</td></tr>`).join('');
 
-  document.getElementById('note').textContent='说明：'+s.note;
+  // 模型性价比表（按会话级 model，受日期筛选影响）
+  const costMap = {};
+  sessFilt.forEach(sb=>{
+    const m = sb.model || 'unknown';
+    if(!costMap[m]) costMap[m] = {model:m, sessions:0, tokens:0, credit:0};
+    costMap[m].sessions += 1;
+    costMap[m].tokens += sb.tokens||0;
+    costMap[m].credit += sb.credit||0;
+  });
+  let costList = Object.values(costMap)
+    .filter(m => m.model !== 'unknown' && m.tokens > 0)
+    .map(m => ({...m, credit_per_1k: m.tokens ? Math.round(m.credit/m.tokens*100000)/100 : 0}));
+  costList.sort((a,b)=>a.credit_per_1k - b.credit_per_1k);
+
+  const tmc = document.querySelector('#tModelCost tbody');
+  if (costList.length) {
+    const best = Math.min.apply(null, costList.map(m => m.credit_per_1k));
+    const worst = Math.max.apply(null, costList.map(m => m.credit_per_1k));
+    tmc.innerHTML = costList.map(m => {
+      const col = (m.credit_per_1k === best) ? 'var(--green)'
+                : (m.credit_per_1k === worst) ? 'var(--red)' : '';
+      const promo = (m.credit === 0 && m.tokens >= 1_000_000) ? '<span class="zero-credit">(限免/促销)</span>' : '';
+      return `<tr>
+        <td><span class="tag">${esc(m.model)}</span>${promo}</td>
+        <td class="num">${m.sessions}</td>
+        <td class="num">${fmt(m.tokens)}</td>
+        <td class="num">${m.credit.toFixed(2)}</td>
+        <td class="num" style="color:${col};font-weight:600">${m.credit_per_1k}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    tmc.innerHTML = `<tr><td colspan="5" class="err">${t('emptyCost')}</td></tr>`;
+  }
+
+  // 模型优化建议：按当前筛选后的数据重新生成一句提示
+  const mt = document.getElementById('modelTips');
+  const substantial = costList.filter(m =>
+    !['auto','unknown'].includes(m.model) &&
+    !m.model.includes('preview') && !m.model.includes('agent') &&
+    m.tokens >= 10_000_000 && m.credit > 0
+  );
+  let tipsHtml = '';
+  if (substantial.length >= 2) {
+    const cheapest = substantial.reduce((a,b)=>a.credit_per_1k<b.credit_per_1k?a:b);
+    const priciest = substantial.reduce((a,b)=>a.credit_per_1k>b.credit_per_1k?a:b);
+    const save = priciest.credit_per_1k ? ((priciest.credit_per_1k - cheapest.credit_per_1k)/priciest.credit_per_1k*100) : 0;
+    tipsHtml += t('tipOptimize')(esc(cheapest.model), cheapest.credit_per_1k, esc(priciest.model), priciest.credit_per_1k, save.toFixed(0));
+  }
+  const zeroPromo = costList.filter(m => m.credit===0 && m.tokens>=1_000_000);
+  zeroPromo.forEach(m=>{
+    tipsHtml += `<br>${t('tipPromo')(esc(m.model))}`;
+  });
+  if (!tipsHtml) {
+    tipsHtml = t('tipNoModel');
+  }
+  mt.innerHTML = tipsHtml;
+
+  document.getElementById('note').textContent = t('bottomNote');
+  renderSpikeDays();
 }
-function esc(s){return (''+s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+// 用量高峰探查: 渲染按 credit 排序最高的几天, 逐日拆解成因(不受日期筛选影响, 始终基于全量)
+function renderSpikeDays(){
+  const host = document.getElementById('spikeDays');
+  if(!host) return;
+  const arr = (T.spike_days || []);
+  if(!arr.length){ host.innerHTML = `<div class="note">${t('spikeNoData')}</div>`; return; }
+  host.innerHTML = arr.map(s => {
+    const sessRows = (s.top_sessions || []).map(x =>
+      `<tr><td>${esc(x.title || '(无标题)')}</td><td><span class="tag">${esc(x.model)}</span></td>
+        <td class="num">${x.credit.toFixed(2)}</td><td class="num">${fmt(x.tokens)}</td></tr>`).join('');
+    const mdl = (s.model_token_top || []).filter(m => m.tokens > 0).map(m => `${esc(m.model)} ${short(m.tokens)}`).join(' · ');
+    return `<div class="spike-day">
+      <div class="spike-head">
+        <span class="spike-date">${s.date}</span>
+        <span class="spike-credit">${s.credit.toFixed(2)} ${t('spikeCredit')}</span>
+        <span class="tag">${s.requests} ${t('spikeReq')}</span>
+        <span class="tag">${s.sessions} ${t('spikeSess')}</span>
+        <span class="tag">${t('spikeErrRate')} ${s.err_rate}%</span>
+        <span class="tag">${t('spikeAvgCalls')} ${s.avg_calls}</span>
+        <span class="tag">${t('spikeMaxReq')} ${short(s.max_request_tokens)} tok</span>
+      </div>
+      <div class="spike-body">
+        <div class="spike-col"><div class="spike-sub">${t('spikeSubSessions')}</div>
+          <table><thead><tr><th>${t('thSess2')||t('thSession')}</th><th>${t('thModel')}</th><th class="num">${t('thCredit2')||t('thCredit')}</th><th class="num">${t('thToken2')||t('thToken')}</th></tr></thead>
+          <tbody>${sessRows || `<tr><td colspan="4">${t('spikeNone')}</td></tr>`}</tbody></table></div>
+        <div class="spike-col"><div class="spike-sub">${t('spikeSubModel')}</div>
+          <div class="note">${mdl || t('spikeNone')}</div></div>
+      </div>
+      ${(s.n_zero_credit || s.n_small_credit) ? `<div class="note" style="margin-top:8px;">${t('spikeHidden')(s.n_zero_credit || 0, s.n_small_credit || 0)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// 聚合请求到模型
+function groupTokensByModel(reqs){
+  const m={};
+  reqs.forEach(r=>{
+    const model = r.model || 'unknown';
+    m[model] = (m[model]||0) + (r.tokens||0);
+  });
+  return Object.entries(m).map(([model,tokens])=>({model,tokens})).sort((a,b)=>b.tokens-a.tokens);
+}
+function groupEffByModel(reqs){
+  const m={};
+  reqs.forEach(r=>{
+    const model = r.model || 'unknown';
+    if(!m[model]) m[model]={model, output:0, thinking:0};
+    m[model].output += r.output||0;
+    m[model].thinking += r.thinking_sec||0;
+  });
+  return Object.values(m).map(o=>({
+    model:o.model,
+    efficiency: o.thinking ? Math.round(o.output/o.thinking*10)/10 : 0
+  })).sort((a,b)=>b.efficiency-a.efficiency);
+}
+function top10others(arr){
+  if(!arr.length) return {labels:['无数据'], data:[0]};
+  if(arr.length<=10) return {labels:arr.map(x=>x.key||x.model), data:arr.map(x=>x.val||x.tokens)};
+  const top = arr.slice(0,10);
+  const other = arr.slice(10).reduce((a,b)=>a+(b.val||b.tokens||0),0);
+  return {
+    labels: top.map(x=>x.key||x.model).concat(['其他']),
+    data: top.map(x=>x.val||x.tokens).concat([other])
+  };
+}
+function topN(arr, n){
+  if(!arr.length) return {labels:['无数据'], data:[0]};
+  const top = arr.slice(0, n);
+  return {labels: top.map(x=>x.key||x.model), data: top.map(x=>x.val||x.tokens)};
+}
 </script>
 </body>
 </html>

@@ -240,6 +240,7 @@ for sb in by_session.values():
     sb["title"] = meta.get("title", "")[:60]
     sb["status"] = meta.get("status", "")
     sb["models"] = ",".join(sorted(sb["models"]))
+    sb["model"] = meta.get("model", "") or "unknown"
     sb["thinking_sec"] = round(sb["thinking_sec"], 1)
     # credit 每个会话只计一次(来自 session_usage 的会话级汇总)
     cr = sess_credit.get(sb["session_id"], {}).get("credit", 0)
@@ -248,8 +249,125 @@ for sb in by_session.values():
     fd = sess_first.get(sb["session_id"])
     if fd and fd in by_day:
         by_day[fd]["credit"] += cr
+    sb["first_date"] = fd or ""
     sess_list.append(sb)
 sess_list.sort(key=lambda x: x["tokens"], reverse=True)
+
+# ---------- 2.6 模型性价比 (会话级 model 聚合, 关联 sessions.model) ----------
+print("[2.6] 模型性价比 ...", flush=True)
+model_cost = {}
+for sb in sess_list:
+    m = sb.get("model") or "unknown"
+    mc = model_cost.setdefault(
+        m,
+        {"model": m, "sessions": 0, "tokens": 0, "credit": 0.0},
+    )
+    mc["sessions"] += 1
+    mc["tokens"] += sb["tokens"]
+    mc["credit"] += sb["credit"]
+model_cost_list = []
+for mc in model_cost.values():
+    if mc["model"] == "unknown" or mc["tokens"] <= 0:
+        continue
+    c1k = (mc["credit"] / mc["tokens"] * 1000.0) if mc["tokens"] else 0.0
+    mc["credit_per_1k"] = round(c1k, 5)
+    # 标记限时免费/促销模型：credit 为 0 但 token 不少（可能 WorkBuddy 内部倍率为 0）
+    mc["zero_credit"] = (mc["credit"] <= 0.0 and mc["tokens"] >= 1_000_000)
+    model_cost_list.append(mc)
+model_cost_list.sort(key=lambda x: x["credit_per_1k"])
+
+# 优化建议: 在可比任务量(≥1000万token)的通用模型间, 比较最便宜与最贵
+model_tips = []
+substantial = [
+    m for m in model_cost_list
+    if m["model"] not in ("auto", "unknown")
+    and "preview" not in m["model"]
+    and "agent" not in m["model"]
+    and m["tokens"] >= 10_000_000
+    and m["credit"] > 0.0          # 排除限时免费/促销模型，避免把“当前零成本”当成长期基准
+]
+if len(substantial) >= 2:
+    cheapest = min(substantial, key=lambda x: x["credit_per_1k"])
+    priciest = max(substantial, key=lambda x: x["credit_per_1k"])
+    if priciest["credit_per_1k"] > 0:
+        save = (priciest["credit_per_1k"] - cheapest["credit_per_1k"]) / priciest["credit_per_1k"] * 100
+        if save >= 5:
+            model_tips.append(
+                f"在可比任务量下(均≥1000万token)，切换至「{cheapest['model']}」"
+                f"(credit/1k={cheapest['credit_per_1k']}) 相比「{priciest['model']}」"
+                f"(credit/1k={priciest['credit_per_1k']}) 预计节省约 {save:.0f}% 的 credit；"
+                f"前提是两个模型处理的工作负载可互相迁移。")
+# 单独提示零 credit 模型
+for m in model_cost_list:
+    if m["zero_credit"] and m["tokens"] >= 10_000_000:
+        model_tips.append(
+            f"「{m['model']}」当前 credit/1k=0（消耗 credit {m['credit']:.2f}），"
+            f"可能处于限免/促销期；不建议把它作为长期成本基准。")
+
+# ---------- 2.7 用量高峰探查 (非异常判定, 仅定位高用量日并拆解成因) ----------
+# 用户原话: 不需要"正常/异常"二分, 但要能自动找出几个明显高的使用日,
+# 并像案例分析那样拆解"那天发生了什么"(主导会话/模型构成/错误率/最大单请求)。
+# 精确到天(而非模糊窗口), 因为图里看不出哪天用得最多。
+print("[2.7] 用量高峰探查 ...", flush=True)
+daily_credit = {b["date"]: b["credit"] for b in day_list if b["date"] != "unknown"}
+cr_vals = sorted(daily_credit.values())
+median_cr = cr_vals[len(cr_vals) // 2] if cr_vals else 0.0
+thr = max(median_cr * 2.0, 50.0)          # 高于中位数 2 倍才算"明显高"
+cand = sorted([(d, v) for d, v in daily_credit.items() if v >= thr],
+              key=lambda x: x[1], reverse=True)
+top_days = [d for d, _ in cand[:6]]
+if len(top_days) < 3:                      # 兜底: 样本不足时也至少给 top3
+    top_days = [d for d, _ in sorted(daily_credit.items(), key=lambda x: x[1], reverse=True)[:3]]
+
+spike_days = []
+for d in top_days:
+    day_reqs = [r for r in requests if r["date"] == d]
+    sess_ids = {r["session_id"] for r in day_reqs if r["session_id"]}
+    # 仅纳入 credit 归因到当日的会话(与每日 credit 口径一致), 避免跨日会话重复计入
+    sess_on_day = []
+    for sid in sess_ids:
+        if sess_first.get(sid) == d:
+            cr = sess_credit.get(sid, {}).get("credit", 0.0)
+            meta = sess_meta.get(sid, {})
+            sess_on_day.append({
+                "session_id": sid[:12],
+                "title": (meta.get("title", "") or "")[:40],
+                "model": meta.get("model", "") or "unknown",
+                "credit": round(cr, 2),
+                "tokens": sum(r["tokens"] for r in day_reqs if r["session_id"] == sid),
+            })
+    sess_on_day.sort(key=lambda x: x["credit"], reverse=True)
+    sess_on_day_nz = [x for x in sess_on_day if x["credit"] > 0]
+    n_zero_credit = len(sess_on_day) - len(sess_on_day_nz)
+    # 50倍比例规则: 仅显示在当日峰值会话 credit 的 1/50 及以上的会话;
+    # 峰值与最小显示值差距≤50倍, 自动隐藏个位数等噪音会话(如美团优惠券 3.75 vs 峰值 1130.78).
+    top_cr = sess_on_day_nz[0]["credit"] if sess_on_day_nz else 0.0
+    ratio_thr = top_cr / 50.0
+    shown_sessions = [x for x in sess_on_day_nz if x["credit"] >= ratio_thr]
+    n_small_credit = len(sess_on_day_nz) - len(shown_sessions)
+    mdl = {}
+    for r in day_reqs:
+        mdl[r["model"]] = mdl.get(r["model"], 0) + r["tokens"]
+    mdl_sorted = sorted(mdl.items(), key=lambda x: x[1], reverse=True)[:5]
+    n = len(day_reqs)
+    errs = sum(r["errors"] for r in day_reqs)
+    calls = sum(r["calls"] for r in day_reqs)
+    max_tok = max((r["tokens"] for r in day_reqs), default=0)
+    spike_days.append({
+        "date": d,
+        "credit": round(daily_credit[d], 2),
+        "requests": n,
+        "sessions": len(sess_ids),
+        "errors": errs,
+        "err_rate": round(errs / n * 100, 1) if n else 0.0,
+        "avg_calls": round(calls / n, 1) if n else 0.0,
+        "max_request_tokens": max_tok,
+        "model_token_top": [{"model": m, "tokens": t} for m, t in mdl_sorted],
+        "top_sessions": shown_sessions[:8],
+        "n_zero_credit": n_zero_credit,
+        "n_small_credit": n_small_credit,
+        "ratio_threshold": round(ratio_thr, 2),
+    })
 
 total_tokens = sum(r["tokens"] for r in requests)
 total_input = sum(r["input"] for r in requests)
@@ -261,6 +379,7 @@ total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
 summary = {
+    "version": "1.1.0",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "total_requests": len(requests),
     "total_sessions": len(sess_list),
@@ -277,8 +396,14 @@ summary = {
     "date_min": min(dates) if dates else None,
     "date_max": max(dates) if dates else None,
     "model_count": len(model_list),
-    "note": "credit 按会话汇总(模型哈希无法反解为名称);思考用时=generation span 时长之和,为模型推理/思考的代理指标。",
 }
+
+# 用于前端日期筛选的轻量全量请求快照（只保留必要字段，控制体积）
+requests_slim = [
+    {"date": r["date"], "tokens": r["tokens"], "output": r["output"],
+     "thinking_sec": r["thinking_sec"], "model": r["model"], "errors": r["errors"]}
+    for r in requests
+]
 
 # 只保留 top 300 请求用于散点图, 控制文件体积
 requests_trim = sorted(requests, key=lambda x: x["tokens"], reverse=True)[:300]
@@ -291,6 +416,10 @@ out = {
     "by_model": model_list,
     "by_session": sess_list[:200],
     "requests_sample": requests_trim,
+    "requests_slim": requests_slim,
+    "by_model_cost": model_cost_list,
+    "model_tips": model_tips,
+    "spike_days": spike_days,
 }
 
 

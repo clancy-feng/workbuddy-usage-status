@@ -11,7 +11,11 @@ Thumbs.db
 # ClawHub CLI 缓存
 .clawhub/
 
-# Skill 运行时生成的用户侧产物（绝对不能提交）
+# Skill 运行时生成的用户侧产物（绝对不能提交，含真实用量数据）
+usage-status.json
+usage-status.js
+workbuddy-usage-status-dashboard.html
+# 历史旧名（重命名前），保留以防万一
 telemetry.json
 telemetry.js
 workbuddy-telemetry-dashboard.html
