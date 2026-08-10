@@ -121,11 +121,11 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 
 脚本在「输出目录」（即你运行命令时所在目录，或 `--out` 指定的目录）生成 3 个文件：
 
-| 文件 | 说明 |
-| ---- | ---- |
+| 文件                                      | 说明                                  |
+| --------------------------------------- | ----------------------------------- |
 | `workbuddy-usage-status-dashboard.html` | 自包含单文件，数据 + Chart.js 均已内联，双击即看，无需联网 |
-| `usage-status.json` | 聚合后的原始数据，可二次处理 |
-| `usage-status.js` | `window.USAGE_STATUS = {...}`，备用 |
+| `usage-status.json`                     | 聚合后的原始数据，可二次处理                      |
+| `usage-status.js`                       | `window.USAGE_STATUS = {...}`，备用    |
 
 打开 `workbuddy-usage-status-dashboard.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 会话表（按 token 消耗取前 10）+ 每日错误。四张时序图的横轴会按所选日期范围的跨度自动在「日 / 周 / 月」之间切换（≤120 天按日，120–730 天按周，>730 天按月），数据跨度越大越能避免横坐标过密、标签重叠。
 
@@ -145,13 +145,13 @@ python3 scripts/usage_extractor.py --out ./report
 
 ## 5. 指标来源及算法（详情见 DATA-GUIDE.md）
 
-| 指标 | 算法 | 数据来源 |
-| ---- | ---- | ---- |
-| 思考用时 | 每条 trace 里 `type=generation` 的 span 时长之和 | `traces/*/trace_*.json` |
-| 思考效率 | 输出 token ÷ 思考秒数（tok/s） | `traces/*/trace_*.json` |
-| token 消耗 | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合 | `traces/*/trace_*.json` |
-| credit 消耗 | `session_usage.credit_json` 会话级汇总；看板按「归首日」归因到会话首次出现日；提供用量导出 xlsx 可覆盖为精确值 | `workbuddy.db` |
-| Top 会话 | 按 token 消耗降序取前 10 个会话，列出标题/token/思考时长/credit/错误数 | `traces/*` + `workbuddy.db` |
+| 指标        | 算法                                                                       | 数据来源                        |
+| --------- | ------------------------------------------------------------------------ | --------------------------- |
+| 思考用时      | 每条 trace 里 `type=generation` 的 span 时长之和                                 | `traces/*/trace_*.json`     |
+| 思考效率      | 输出 token ÷ 思考秒数（tok/s）                                                   | `traces/*/trace_*.json`     |
+| token 消耗  | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合                                        | `traces/*/trace_*.json`     |
+| credit 消耗 | `session_usage.credit_json` 会话级汇总；看板按「归首日」归因到会话首次出现日；提供用量导出 xlsx 可覆盖为精确值 | `workbuddy.db`              |
+| Top 会话    | 按 token 消耗降序取前 10 个会话，列出标题/token/思考时长/credit/错误数                         | `traces/*` + `workbuddy.db` |
 
 ---
 
@@ -167,12 +167,12 @@ python3 scripts/usage_extractor.py --out ./report
 
 ## 7. 故障排查
 
-| 现象 | 原因 / 处理 |
-| ---- | ---- |
-| 打开 HTML 显示"数据未加载" | 没先跑脚本；或脚本报错中断。重跑 `usage_extractor.py` 看 stderr |
-| 图表空白但数字在 | 极少见：若报错"缺少 chart.umd.min.js"，确认该文件与 usage_extractor.py 同在 scripts/ 下后重跑；正常情况 Chart.js 已随包内联，零外网依赖 |
-| 数据库被占用 | 抽取器以只读模式（`mode=ro`）打开，正常不影响正在运行的 WorkBuddy |
-| 数据明显偏少 | 这台机器 traces 少/刚装；或 `--home` 指错了目录 |
+| 现象                | 原因 / 处理                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
+| 打开 HTML 显示"数据未加载" | 没先跑脚本；或脚本报错中断。重跑 `usage_extractor.py` 看 stderr                                                    |
+| 图表空白但数字在          | 极少见：若报错"缺少 chart.umd.min.js"，确认该文件与 usage_extractor.py 同在 scripts/ 下后重跑；正常情况 Chart.js 已随包内联，零外网依赖 |
+| 数据库被占用            | 抽取器以只读模式（`mode=ro`）打开，正常不影响正在运行的 WorkBuddy                                                        |
+| 数据明显偏少            | 这台机器 traces 少/刚装；或 `--home` 指错了目录                                                                 |
 
 ---
 
