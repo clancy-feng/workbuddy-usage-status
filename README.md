@@ -143,7 +143,7 @@ python3 scripts/usage_extractor.py --out ./report
 
 ---
 
-## 5. 指标来源及算法（详情见 data-guide.md）
+## 5. 指标来源及算法（详情见 DATA-GUIDE.md）
 
 | 指标 | 算法 | 数据来源 |
 | ---- | ---- | ---- |
@@ -179,7 +179,7 @@ python3 scripts/usage_extractor.py --out ./report
 ## ❓ 常见问题（FAQ）
 
 **Q：看板里的数字和 WorkBuddy 自己显示的对不上？**
-A：本看板只读 `~/.workbuddy` 下的本地数据（traces + workbuddy.db），与 WorkBuddy 自身统计口径可能不同——本工具只统计「有 token 消耗的请求」，排除零用量的工作流记账噪声。以本看板口径为准，详见 data-guide.md。
+A：本看板只读 `~/.workbuddy` 下的本地数据（traces + workbuddy.db），与 WorkBuddy 自身统计口径可能不同——本工具只统计「有 token 消耗的请求」，排除零用量的工作流记账噪声。以本看板口径为准，详见 DATA-GUIDE.md。
 
 **Q：为什么某天 credit 特别高、相邻几天却是 0？**
 A：因为本地 `credit_json` 没有逐日时间戳，看板把整个会话的 credit 归因到它「首次出现」的那天（归首日）。所以一个跨多天的会话，credit 只在它第一次出现的那天计入「每日 credit」，后续天不体现——这正好避免了把 credit 编造到免费/无消费的日子里（例如用免费 HY3 续跑的旧会话，后续天只有 token、零 credit）。这是当前本地数据源的粒度极限；要精确到分，用 `--credit-xlsx` 导入用量导出（见已知限制第 1 条）。
