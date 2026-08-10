@@ -63,6 +63,7 @@
   <div class="sub" id="sub">加载中…</div>
   <button class="lang-toggle" id="langToggle">EN</button>
 </header>
+<div id="dataWarn" style="display:none;margin:12px 16px;padding:10px 14px;border:1px solid #e0a800;border-radius:8px;background:#fff8e1;color:#7a5b00;font-size:13px;line-height:1.6"></div>
 <div class="wrap" id="app" style="display:none">
   <div class="filter-bar">
     <label data-i18n="start">起始日期 <input type="date" id="startDate"></label>
@@ -248,6 +249,14 @@ function init(){
   });
   applyStaticLang();
   render(minD, maxD);
+  renderWarnings();
+}
+
+function renderWarnings(){
+  const el = document.getElementById('dataWarn');
+  if (!el || !T || !T.warnings || !T.warnings.length) return;
+  el.innerHTML = '⚠ ' + T.warnings.map(w => w.detail).join('<br>⚠ ');
+  el.style.display = 'block';
 }
 
 function render(start, end){

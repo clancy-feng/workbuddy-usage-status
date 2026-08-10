@@ -18,6 +18,10 @@ TRACES = os.path.join(HOME, "traces", "*", "trace_*.json")
 # 脚本所在目录(模板与脚本一起搬运, 与 cwd 无关)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# 数据完整性计数器：把被静默跳过的记录暴露出来，避免用户误以为报告完整
+skipped_trace_files = []   # (路径, 错误) 损坏或无法解析的 trace 文件
+bad_credit_sessions = 0    # credit_json 解析失败的会话数
+
 # 输出目录: 默认当前工作目录, 可用 --out 覆盖
 parser = argparse.ArgumentParser(description="WorkBuddy 本地 usage-status 抽取器")
 parser.add_argument("--out", default=os.getcwd(),
@@ -80,7 +84,7 @@ try:
             try:
                 credit_total = sum(float(v) for v in json.loads(cj).values())
             except Exception:
-                pass
+                bad_credit_sessions += 1
         sess_credit[sid] = {
             "used": used or 0,
             "size": size or 0,
@@ -108,7 +112,8 @@ for i, fp in enumerate(files):
     try:
         with open(fp, "r", encoding="utf-8", errors="ignore") as f:
             data = json.load(f)
-    except Exception:
+    except Exception as e:
+        skipped_trace_files.append((fp, str(e)[:80]))
         continue
     tr = data.get("trace", {})
     mi = tr.get("modelInfo", {}) or {}
@@ -382,7 +387,7 @@ total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
 summary = {
-    "version": "1.1.0",
+    "version": "1.1.1",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "total_requests": len(requests),
     "total_sessions": len(sess_list),
@@ -424,6 +429,24 @@ out = {
     "model_tips": model_tips,
     "spike_days": spike_days,
 }
+
+# 数据完整性提示：把被静默跳过的记录暴露出来，避免用户误以为报告完整
+warnings = []
+if skipped_trace_files:
+    names = "；".join(os.path.basename(x[0]) for x in skipped_trace_files[:5])
+    more = " 等" if len(skipped_trace_files) > 5 else ""
+    warnings.append({
+        "type": "skipped_traces",
+        "count": len(skipped_trace_files),
+        "detail": f"已跳过 {len(skipped_trace_files)} 个损坏/无法解析的 trace 文件（报告可能不完整）：{names}{more}",
+    })
+if bad_credit_sessions:
+    warnings.append({
+        "type": "bad_credit",
+        "count": bad_credit_sessions,
+        "detail": f"{bad_credit_sessions} 个会话的 credit_json 解析失败，相关会话 credit 计为 0（不影响 token 与每日趋势）。",
+    })
+out["warnings"] = warnings
 
 
 # ---------- 4. 写出 ----------
@@ -470,5 +493,9 @@ print(f"请求数: {summary['total_requests']}  会话数: {summary['total_sessi
 print(f"总 token: {summary['total_tokens']:,}  总思考用时: {summary['total_thinking_hours']} h")
 print(f"总 credit: {summary['total_credit']}  错误: {summary['total_errors']}")
 print(f"日期范围: {summary['date_min']} ~ {summary['date_max']}")
+if warnings:
+    print("\n⚠ 数据完整性提示：")
+    for w in warnings:
+        print(f"  - {w['detail']}")
 print(f"输出: {OUT_JSON}")
 print(f"输出: {OUT_JS}")

@@ -2,7 +2,7 @@
 name: "workbuddy-usage-status"
 slug: workbuddy-usage-status
 displayName: "WorkBuddy 使用状态看板"
-version: 1.1.0
+version: 1.1.1
 description: "离线可视化 WorkBuddy 本机使用数据（token / credit 消耗、思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。当用户想查看、生成或导出 WorkBuddy 使用状态 / 使用统计 / 工作信息看板时调用。纯本地、零外网依赖、可搬运。 EN: Offline dashboard for WorkBuddy local usage analytics (token / credit consumption, thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection). Triggers when the user wants to view, generate, or export their WorkBuddy usage status / stats / activity dashboard. Fully local, zero network dependency, portable."
 agent_created: true
 license: MIT
