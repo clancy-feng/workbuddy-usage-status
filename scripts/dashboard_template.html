@@ -57,6 +57,7 @@
   .spike-body{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;}
   .spike-col{min-width:0;}
   .spike-sub{color:var(--muted);font-size:11px;margin-bottom:6px;}
+  .spike-mdl{font-size:14px;line-height:1.9;color:var(--text);word-break:break-word;}
   @media(max-width:1000px){.spike-body{grid-template-columns:1fr}}
   @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}
 </style>
@@ -82,8 +83,8 @@
     <div class="card"><h3 data-i18n="cardDailyThink">每日思考用时（小时）</h3><canvas id="cDailyThink"></canvas></div>
     <div class="card"><h3 data-i18n="cardDailyCredit">每日积分消耗（credit）<span class="est-badge local" id="creditBadge"></span></h3><div class="hint" data-i18n="hintDailyCredit">本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不会编造到免费/无消费日）；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。</div><canvas id="cDailyCredit"></canvas></div>
     <div class="card"><h3 data-i18n="cardModelShare">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare"></canvas></div>
-    <div class="card"><h3 data-i18n="cardModelEff">各模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数，越高越“省时”；仅统计样本数 ≥ 5 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff"></canvas></div>
-    <div class="card full"><h3 data-i18n="cardScatter">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter">每个点=一次请求；右下方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
+    <div class="card"><h3 data-i18n="cardModelEff">主要模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数，越高越“省时”；仅统计样本数 ≥ 10 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff"></canvas></div>
+    <div class="card"><h3 data-i18n="cardScatter">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter">每个点=一次请求；右下方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
     <div class="card full"><h3 data-i18n="cardTopSessions">Top 10 会话</h3><div class="hint" data-i18n="hintTopSessions">会话标题 + 模型 + 思考用时 + credit 消耗</div>
       <div class="tbl-scroll"><table id="tSessions"><thead><tr>
         <th data-i18n="thSession">会话标题</th><th data-i18n="thModel">模型</th><th class="num" data-i18n="thReq">请求数</th><th class="num" data-i18n="thToken">Token</th>
@@ -112,6 +113,13 @@
 <script>
 const T = window.USAGE_STATUS;
 const charts = [];
+// 效率排名最小样本数：过滤样本数 < 10 的模型，避免小样本比值受单点噪声主导而虚高排名。
+// 放到顶部常量区，确保在 init()->render()->groupEffByModel() 首次调用前已完成初始化（const 有暂时性死区）。
+const MIN_EFF_SAMPLES = 10;
+// 时间轴自适应粒度阈值：根据筛选范围跨度自动选择桶粒度，避免大跨度下横坐标过密。
+// 跨度 ≤ 120 天 → 按日；120 天 < 跨度 ≤ 730 天 → 按周（周一为周起始）；> 730 天 → 按月。
+const TIME_GRAN_DAY_MAX = 120;
+const TIME_GRAN_WEEK_MAX = 730;
 function detectLang(){
   try { var s = localStorage.getItem('wb_lang'); if (s) return s; } catch(e){}
   var nav = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language.toLowerCase() : '';
@@ -122,7 +130,7 @@ let LANG = detectLang();
 const I18N = {
   zh: {
     title: "Workbuddy使用数据看板",
-    subGenerated: "生成时间", subRange: "数据范围", subFilter: "筛选范围", subReq: "请求", subSess: "会话", subModel: "模型",
+    subGenerated: "生成时间", subRange: "数据范围", subFilter: "筛选范围", subReq: "请求", subSess: "会话", subModel: "模型", subGran: "聚合粒度",
     start: "起始日期", end: "结束日期", update: "更新",
     kpiRequests: "总请求数", kpiToken: "总 Token", kpiCredit: "总 Credit", kpiThink: "思考用时", kpiEff: "平均效率", kpiErr: "错误数",
     unitHour: "小时", unitTokS: "tok/s",
@@ -130,7 +138,7 @@ const I18N = {
     hintDailyToken: "按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量（主角指标）。",
     hintDailyCredit: "本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不会编造到免费/无消费日）；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。",
     badgeLocal: "本地估算", badgePrecise: "精确（用量导出）",
-    cardModelShare: "各模型 Token 占比", cardModelEff: "各模型思考效率",
+    cardModelShare: "各模型 Token 占比", cardModelEff: "主要模型思考效率",
     cardScatter: "思考效率散点：思考用时 × 输出 token", cardTopSessions: "Top 10 会话",
     cardSpike: "用量高峰探查（自动定位明显高的使用日）", cardCost: "模型性价比排行（credit / 千 token）",
     cardErrors: "每日错误数",
@@ -161,7 +169,7 @@ const I18N = {
   },
   en: {
     title: "WorkBuddy Usage Data Dashboard",
-    subGenerated: "Generated", subRange: "Range", subFilter: "Filtered", subReq: "reqs", subSess: "sessions", subModel: "models",
+    subGenerated: "Generated", subRange: "Range", subFilter: "Filtered", subReq: "reqs", subSess: "sessions", subModel: "models", subGran: "Granularity",
     start: "Start date", end: "End date", update: "Update",
     kpiRequests: "Total Requests", kpiToken: "Total Token", kpiCredit: "Total Credit", kpiThink: "Thinking Time", kpiEff: "Avg Efficiency", kpiErr: "Errors",
     unitHour: "h", unitTokS: "tok/s",
@@ -169,7 +177,7 @@ const I18N = {
     hintDailyToken: "Attributed by local timezone of each request's startedAt; reflects true daily token usage (hero metric).",
     hintDailyCredit: "Local estimate: session-level credit has no per-day timestamp, attributed to the session's first-seen day by default (never fabricated onto free/zero-spend days); shape approximated, not exact. Provide a usage-export xlsx to override with precise values.",
     badgeLocal: "Local estimate", badgePrecise: "Precise (export)",
-    cardModelShare: "Token Share by Model", cardModelEff: "Thinking Efficiency by Model",
+    cardModelShare: "Token Share by Model", cardModelEff: "Primary Model Thinking Efficiency",
     cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
     cardSpike: "Usage Spike Explorer (auto-detect notable high-usage days)", cardCost: "Model Cost Efficiency (credit / 1k token)",
     cardErrors: "Daily Errors",
@@ -280,11 +288,59 @@ function renderWarnings(){
   el.style.display = 'block';
 }
 
+// 时间轴自适应粒度：根据当前筛选范围跨度选择桶（日 / 周 / 月），聚合后作为时序图横坐标。
+function granularityForSpan(start, end){
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  const span = Math.max(0, Math.round((e - s) / 86400000)) + 1;
+  if (span <= TIME_GRAN_DAY_MAX) return {gran:'day', span};
+  if (span <= TIME_GRAN_WEEK_MAX) return {gran:'week', span};
+  return {gran:'month', span};
+}
+// 周一为起始的 ISO 周起始日期（按本地时区格式化，避免 toISOString 的 UTC 偏移）
+function isoWeekStart(dateStr){
+  const dt = new Date(dateStr + 'T00:00:00');
+  const dow = (dt.getDay() + 6) % 7; // 0 = 周一
+  dt.setDate(dt.getDate() - dow);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+// 把日级数据聚合到当前粒度桶（求和：总量 / 总思考秒 / 错误数）
+function buildBuckets(dayFilt, gran){
+  const map = new Map();
+  dayFilt.forEach(d=>{
+    let key;
+    if (gran === 'day') key = d.date;
+    else if (gran === 'week') key = isoWeekStart(d.date);
+    else key = d.date.slice(0,7); // YYYY-MM
+    if(!map.has(key)) map.set(key, {label:key, tokens:0, credit:0, thinking_sec:0, errors:0});
+    const b = map.get(key);
+    b.tokens += d.tokens||0;
+    b.credit += d.credit||0;
+    b.thinking_sec += d.thinking_sec||0;
+    b.errors += d.errors||0;
+  });
+  return [...map.values()].sort((a,b)=> a.label < b.label ? -1 : (a.label > b.label ? 1 : 0));
+}
+
 function render(start, end){
   const s=T.summary;
   const cs = (s && s.credit_source) || 'local_estimate';
   const hasFilter = start && end && (start!==defaultRange()[0] || end!==defaultRange()[1]);
   const inRange = d => between(d, start, end);
+
+  // 时间轴自适应粒度：根据筛选范围跨度选择日/周/月桶（glT/glS 供副标题与标题使用，需先于 sub 行）
+  const granInfo = granularityForSpan(start, end);
+  const gkey = granInfo.gran;
+  const zh = LANG !== 'en';
+  const G = {day:{zhT:'每日',enT:'Daily',zhS:'按日',enS:'by day'},
+             week:{zhT:'每周',enT:'Weekly',zhS:'按周',enS:'by week'},
+             month:{zhT:'每月',enT:'Monthly',zhS:'按月',enS:'by month'}};
+  const GP = G[gkey] || G.day;
+  const glT = zh ? GP.zhT : GP.enT;
+  const glS = zh ? GP.zhS : GP.enS;
 
   // 按日期筛选后的会话、请求
   const sessFilt = T.by_session.filter(sb => inRange(sb.first_date));
@@ -308,7 +364,8 @@ function render(start, end){
 
   document.getElementById('sub').innerHTML =
     `${t('subGenerated')} ${s.generated_at} ｜ ${hasFilter?t('subFilter'):t('subRange')} ${start} ~ ${end}` +
-    ` ｜ ${t('subReq')} ${fmt(kpi.requests)} ｜ ${t('subSess')} ${kpi.sessions} ｜ ${t('subModel')} ${s.model_count}`;
+    ` ｜ ${t('subReq')} ${fmt(kpi.requests)} ｜ ${t('subSess')} ${kpi.sessions} ｜ ${t('subModel')} ${s.model_count}` +
+    ` ｜ ${t('subGran')} ${glS}`;
 
   const app=document.getElementById('app'); app.style.display='block';
   const kpis=[
@@ -324,33 +381,50 @@ function render(start, end){
      <div class="val ${k.err?'err':''}">${k.val}${k.est?'<span class="est" title="本地估算">≈</span>':''}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div></div>`).join('');
 
   const dayFilt = T.by_day.filter(d => inRange(d.date));
+  // 时间轴自适应粒度：按筛选范围跨度选择桶（granInfo/glT/glS 已在 render 顶部定义），再聚合。
+  const buckets = buildBuckets(dayFilt, granInfo.gran);
   const grid={color:'#2a2f3a'};
   Chart.defaults.color='#9aa3b2';
   Chart.defaults.borderColor='#333845';
   Chart.defaults.font.family='-apple-system,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif';
 
+  // 时间轴粒度自适应：更新 4 张时序图的标题与提示
+  const cardTitle = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('h3'); if(h) h.textContent = zh?zhTxt:enTxt;} };
+  const cardHint = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('.hint'); if(h) h.textContent = zh?zhTxt:enTxt;} };
+  cardTitle('cDailyToken', glT+' Token 消耗', glT+' Token Usage');
+  cardTitle('cDailyCredit', glT+' 积分消耗（credit）', glT+' Credit');
+  cardTitle('cDailyThink', glT+' 思考用时（小时）', glT+' Thinking Time (hours)');
+  cardTitle('cErrors', glT+' 错误数', glT+' Errors');
+  if (gkey === 'day'){
+    cardHint('cDailyToken', t('hintDailyToken'), t('hintDailyToken'));
+    cardHint('cDailyCredit', t('hintDailyCredit'), t('hintDailyCredit'));
+  } else {
+    cardHint('cDailyToken', `${glT} Token 总量（先按本地时区归日，再按${glS}聚合）。`, `${glT} total tokens (day-attributed by local timezone, then aggregated ${glS}).`);
+    cardHint('cDailyCredit', `${glT} credit 总量（本地估算/精确，按${glS}聚合；趋势形状近似）。`, `${glT} total credit (local estimate or precise, aggregated ${glS}; shape approximated).`);
+  }
+
   destroyCharts();
 
-  // 每日 token（主角指标，本地精确）
-  charts.push(new Chart(cDailyToken,{type:'line',data:{labels:dayFilt.map(d=>d.date),
-    datasets:[{label:t('dsToken'),data:dayFilt.map(d=>d.tokens),borderColor:'#4f9dff',
+  // 每日 token（主角指标，本地精确）—— 按当前粒度桶聚合
+  charts.push(new Chart(cDailyToken,{type:'line',data:{labels:buckets.map(b=>b.label),
+    datasets:[{label:t('dsToken'),data:buckets.map(b=>b.tokens),borderColor:'#4f9dff',
       backgroundColor:'rgba(79,157,255,.15)',fill:true,tension:.3,pointRadius:2}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 每日 credit（估算 / 精确，取决于是否提供 xlsx）
+  // 每日 credit（估算 / 精确，取决于是否提供 xlsx）—— 按当前粒度桶聚合
   const creditBadge = document.getElementById('creditBadge');
   if (creditBadge){
     if (cs === 'xlsx_precise'){ creditBadge.textContent = t('badgePrecise'); creditBadge.className = 'est-badge precise'; }
     else { creditBadge.textContent = t('badgeLocal'); creditBadge.className = 'est-badge local'; }
   }
-  charts.push(new Chart(cDailyCredit,{type:'line',data:{labels:dayFilt.map(d=>d.date),
-    datasets:[{label:t('dsCredit'),data:dayFilt.map(d=>d.credit),borderColor:'#ffcc66',
+  charts.push(new Chart(cDailyCredit,{type:'line',data:{labels:buckets.map(b=>b.label),
+    datasets:[{label:t('dsCredit'),data:buckets.map(b=>b.credit),borderColor:'#ffcc66',
       backgroundColor:'rgba(255,204,102,.15)',fill:true,tension:.3,pointRadius:2}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 每日思考用时
-  charts.push(new Chart(cDailyThink,{type:'bar',data:{labels:dayFilt.map(d=>d.date),
-    datasets:[{label:t('dsThink'),data:dayFilt.map(d=>(d.thinking_sec/3600).toFixed(2)),
+  // 每日思考用时 —— 按当前粒度桶聚合
+  charts.push(new Chart(cDailyThink,{type:'bar',data:{labels:buckets.map(b=>b.label),
+    datasets:[{label:t('dsThink'),data:buckets.map(b=>(b.thinking_sec/3600).toFixed(2)),
       backgroundColor:'#b58cff'}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
@@ -380,9 +454,9 @@ function render(start, end){
       scales:{x:{title:{display:true,text:t('xThink')},grid},
         y:{title:{display:true,text:t('yOutput')},grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 错误
-  charts.push(new Chart(cErrors,{type:'bar',data:{labels:dayFilt.map(d=>d.date),
-    datasets:[{label:t('dsErr'),data:dayFilt.map(d=>d.errors),backgroundColor:'#ff5c5c'}]},
+  // 错误 —— 按当前粒度桶聚合
+  charts.push(new Chart(cErrors,{type:'bar',data:{labels:buckets.map(b=>b.label),
+    datasets:[{label:t('dsErr'),data:buckets.map(b=>b.errors),backgroundColor:'#ff5c5c'}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
   // Top 会话表
@@ -466,7 +540,7 @@ function renderSpikeDays(){
     const sessRows = (s.top_sessions || []).map(x =>
       `<tr><td>${esc(x.title || '(无标题)')}</td><td><span class="tag">${esc(x.model)}</span></td>
         <td class="num">${x.credit.toFixed(2)}</td><td class="num">${fmt(x.tokens)}</td></tr>`).join('');
-    const mdl = (s.model_token_top || []).filter(m => m.tokens > 0).map(m => `${esc(m.model)} ${short(m.tokens)}`).join(' · ');
+    const mdl = (s.model_token_top || []).filter(m => m.tokens > 0).map(m => `${esc(m.model)} ${short(m.tokens)}`).join('<br>');
     return `<div class="spike-day">
       <div class="spike-head">
         <span class="spike-date">${s.date}</span>
@@ -482,7 +556,7 @@ function renderSpikeDays(){
           <table><thead><tr><th>${t('thSess2')||t('thSession')}</th><th>${t('thModel')}</th><th class="num">${t('thCredit2')||t('thCredit')}</th><th class="num">${t('thToken2')||t('thToken')}</th></tr></thead>
           <tbody>${sessRows || `<tr><td colspan="4">${t('spikeNone')}</td></tr>`}</tbody></table></div>
         <div class="spike-col"><div class="spike-sub">${t('spikeSubModel')}</div>
-          <div class="note">${mdl || t('spikeNone')}</div></div>
+          <div class="spike-mdl">${mdl || t('spikeNone')}</div></div>
       </div>
       ${(s.n_zero_credit || s.n_small_credit) ? `<div class="note" style="margin-top:8px;">${t('spikeHidden')(s.n_zero_credit || 0, s.n_small_credit || 0)}</div>` : ''}
     </div>`;
@@ -499,8 +573,7 @@ function groupTokensByModel(reqs){
   return Object.entries(m).map(([model,tokens])=>({model,tokens})).sort((a,b)=>b.tokens-a.tokens);
 }
 // 效率统计的最小样本数：仅用一两次任务的模型，output/thinking 比值受单点噪声主导，
-// 排名不可靠，剔除后再参与「各模型思考效率」排名。
-const MIN_EFF_SAMPLES = 5;
+// 排名不可靠，剔除后再参与「各模型思考效率」排名（常量 MIN_EFF_SAMPLES 已移至脚本顶部常量区）。
 function groupEffByModel(reqs){
   const m={};
   reqs.forEach(r=>{

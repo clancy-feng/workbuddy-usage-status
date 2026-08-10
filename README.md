@@ -127,7 +127,7 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 | `usage-status.json` | 聚合后的原始数据，可二次处理 |
 | `usage-status.js` | `window.USAGE_STATUS = {...}`，备用 |
 
-打开 `workbuddy-usage-status-dashboard.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 会话表（按 token 消耗取前 10）+ 每日错误。
+打开 `workbuddy-usage-status-dashboard.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 会话表（按 token 消耗取前 10）+ 每日错误。四张时序图的横轴会按所选日期范围的跨度自动在「日 / 周 / 月」之间切换（≤120 天按日，120–730 天按周，>730 天按月），数据跨度越大越能避免横坐标过密、标签重叠。
 
 ---
 
