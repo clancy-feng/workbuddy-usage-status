@@ -28,6 +28,10 @@ parser.add_argument("--out", default=os.getcwd(),
                     help="输出目录 (默认: 当前工作目录)")
 parser.add_argument("--home", default=HOME,
                     help="WorkBuddy 数据根目录 (默认: ~/.workbuddy)")
+parser.add_argument("--credit-xlsx", default=None,
+                    help="可选：用量明细 xlsx 路径（来自 workbuddy.cn 用量导出）。提供后，对应日期窗口内的每日 "
+                         "credit 以服务端精确值覆盖本地估算；仅覆盖有数据的日期，其余日期仍为本地估算。"
+                         "低调可选参数，不进默认流程，按需使用。")
 args = parser.parse_args()
 HOME = args.home
 DB = os.path.join(HOME, "workbuddy.db")
@@ -55,7 +59,113 @@ def parse_ts(ts):
 def day_key(ts_ms):
     if not ts_ms:
         return "unknown"
-    return datetime.datetime.utcfromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d")
+    # 按本地时区归日（原为 utcfromtimestamp，临近午夜的请求会被算到前一天，已修正）
+    return datetime.datetime.fromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d")
+
+
+def read_credit_xlsx(path):
+    """stdlib-only 最小 xlsx 读取器（不依赖 openpyxl），返回 {day: credit_sum}。
+    期望列（表头文字，中/英均可）：RequestID / 积分消耗 / 时间（或 requestId / credit / time）。
+    时间按 'YYYY-MM-DD HH:MM:SS' 解析为本地日期。返回空 dict 表示读取失败或无重叠必要列。
+    """
+    import zipfile
+    import xml.etree.ElementTree as ET
+    import re
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+    def col_letter(ref):
+        m = re.match(r"([A-Z]+)", ref or "")
+        return m.group(1) if m else None
+
+    try:
+        z = zipfile.ZipFile(path)
+    except Exception as e:
+        print("  xlsx 打开失败:", e, flush=True)
+        return {}
+    names = set(z.namelist())
+
+    # 共享字符串表
+    shared = []
+    if "xl/sharedStrings.xml" in names:
+        try:
+            root = ET.fromstring(z.read("xl/sharedStrings.xml"))
+            for si in root.iter(ns + "si"):
+                shared.append("".join(t.text or "" for t in si.iter(ns + "t")))
+        except Exception:
+            pass
+
+    # 取第一个 worksheet
+    sheet_path = "xl/worksheets/sheet1.xml"
+    if sheet_path not in names:
+        cands = [n for n in names if n.startswith("xl/worksheets/sheet")]
+        if not cands:
+            print("  xlsx 未找到 worksheet", flush=True)
+            return {}
+        sheet_path = sorted(cands)[0]
+    try:
+        root = ET.fromstring(z.read(sheet_path))
+    except Exception as e:
+        print("  xlsx 解析失败:", e, flush=True)
+        return {}
+
+    rows = []
+    for row in root.iter(ns + "row"):
+        cells = {}
+        for c in row.iter(ns + "c"):
+            ref = c.get("r")
+            col = col_letter(ref)
+            t = c.get("t")
+            v = c.find(ns + "v")
+            isn = c.find(ns + "is")
+            val = None
+            if t == "s" and v is not None:
+                try:
+                    val = shared[int(v.text)]
+                except Exception:
+                    val = None
+            elif isn is not None:
+                val = "".join(tt.text or "" for tt in isn.iter(ns + "t"))
+            elif v is not None:
+                val = v.text
+            if col:
+                cells[col] = val
+        rows.append(cells)
+    if not rows:
+        return {}
+
+    header = rows[0]
+
+    def find_col(names_needed):
+        for col, val in header.items():
+            if val and any(nm.lower() in str(val).lower() for nm in names_needed):
+                return col
+        return None
+
+    rid_c = find_col(["requestid", "RequestID"])
+    cr_c = find_col(["积分消耗", "credit"])
+    tm_c = find_col(["时间", "time"])
+    if not (cr_c and tm_c):
+        print("  xlsx 缺少必要列（积分消耗/credit、时间/time）", flush=True)
+        return {}
+
+    result = {}
+    for cells in rows[1:]:
+        tv = cells.get(tm_c)
+        if not tv:
+            continue
+        try:
+            day = datetime.datetime.strptime(str(tv), "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d")
+        except Exception:
+            day = str(tv)[:10]
+            if len(day) != 10:
+                continue
+        cv = cells.get(cr_c)
+        try:
+            credit = float(cv)
+        except Exception:
+            continue
+        result[day] = result.get(day, 0.0) + credit
+    return result
 
 
 # ---------- 1. 读取 DB: session 元信息 + 用量 ----------
@@ -234,6 +344,13 @@ for dk in days:
     b["credit"] = round(b["credit"], 2)
     day_list.append(b)
 
+# ---- 3.5 可选：用用量导出 xlsx 的精确 credit 覆盖对应日期窗口 ----
+# 注意：覆盖必须放在「会话级 credit 按 token 占比分摊」(sess_list 循环) 之后，
+# 否则分摊逻辑会再次把本地 credit 累加到被覆盖的日期上，造成重复累加。
+credit_source = "local_estimate"
+credit_note = ("本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不编造到后续免费/无消费日）；"
+               "趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。")
+
 model_list = []
 for mb in by_model.values():
     eff = round(mb["output"] / mb["thinking_sec"], 1) if mb["thinking_sec"] else 0.0
@@ -253,13 +370,47 @@ for sb in by_session.values():
     # credit 每个会话只计一次(来自 session_usage 的会话级汇总)
     cr = sess_credit.get(sb["session_id"], {}).get("credit", 0)
     sb["credit"] = round(cr, 2)
-    # 把会话 credit 归因到其首次出现的那一天(避免跨天重复)
-    fd = sess_first.get(sb["session_id"])
+    # 本地无逐日 credit 时间戳，无法精确拆分到天。
+    # 默认把整个会话的 credit 归因到它「首次出现」的那一天(归首日)：
+    # 这是本地能做的「最不坏」方案——credit 绑在会话起点，不会把 credit 编造到
+    # 后续免费/无消费的日子里(例如用免费 HY3 续跑的旧会话)。
+    # 精确每日 credit 只能由 --credit-xlsx 覆盖给出。
+    sid = sb["session_id"]
+    fd = sess_first.get(sid)
+    sb["first_date"] = fd or ""
     if fd and fd in by_day:
         by_day[fd]["credit"] += cr
-    sb["first_date"] = fd or ""
     sess_list.append(sb)
 sess_list.sort(key=lambda x: x["tokens"], reverse=True)
+
+# ---- 3.5 可选：用用量导出 xlsx 的精确 credit 覆盖对应日期窗口 ----
+# 必须放在 sess_list 循环之后（见上方说明），避免分摊逻辑重复累加本地 credit。
+# xlsx_date_min/max：xlsx 实际覆盖的日期窗口，供前端把默认展示范围收敛到该窗口
+# （不锁死筛选器，用户仍可拉回看全量 token 历史）。
+xlsx_date_min = None
+xlsx_date_max = None
+if args.credit_xlsx:
+    print("[3.5] 读取用量导出 xlsx (--credit-xlsx) ...", flush=True)
+    xmap = read_credit_xlsx(args.credit_xlsx)
+    if xmap:
+        covered = 0
+        for b in day_list:
+            if b["date"] in xmap:
+                b["credit"] = round(xmap[b["date"]], 2)
+                covered += 1
+        if covered:
+            credit_source = "xlsx_precise"
+            credit_note = (f"credit 已用用量导出 xlsx 精确覆盖 {covered} 天（窗口内为服务端精确值）；"
+                           f"未覆盖日期仍为本地估算。xlsx 最多含 1 个月，历史长期趋势仍看 token。")
+            xlsx_dates = sorted(xmap.keys())
+            xlsx_date_min = xlsx_dates[0]
+            xlsx_date_max = xlsx_dates[-1]
+            print(f"  xlsx 覆盖 {covered} 天，credit 已更新为精确值；日期窗口 {xlsx_date_min}~{xlsx_date_max}。", flush=True)
+        else:
+            credit_note = "提供的 xlsx 未包含与本地数据重叠的日期，credit 仍为本地估算。"
+            print("  xlsx 与本地数据无日期重叠，credit 维持本地估算。", flush=True)
+    else:
+        print("  xlsx 读取失败或未识别到必要列，credit 维持本地估算。", flush=True)
 
 # ---------- 2.6 模型性价比 (会话级 model 聚合, 关联 sessions.model) ----------
 print("[2.6] 模型性价比 ...", flush=True)
@@ -331,22 +482,28 @@ spike_days = []
 for d in top_days:
     day_reqs = [r for r in requests if r["date"] == d]
     sess_ids = {r["session_id"] for r in day_reqs if r["session_id"]}
-    # 仅纳入 credit 归因到当日的会话(与每日 credit 口径一致), 避免跨日会话重复计入
+    # 与每日 credit 口径一致(归首日)：spike 日 d 的 credit 来自「首次出现在 d 的会话」，
+    # 列出这些会话并展示其会话级全额 credit(不按 token 二次拆分，避免把 credit 编造到免费日子)。
     sess_on_day = []
+    n_zero_credit = 0
     for sid in sess_ids:
-        if sess_first.get(sid) == d:
-            cr = sess_credit.get(sid, {}).get("credit", 0.0)
-            meta = sess_meta.get(sid, {})
-            sess_on_day.append({
-                "session_id": sid[:12],
-                "title": (meta.get("title", "") or "")[:40],
-                "model": meta.get("model", "") or "unknown",
-                "credit": round(cr, 2),
-                "tokens": sum(r["tokens"] for r in day_reqs if r["session_id"] == sid),
-            })
+        if sess_first.get(sid) != d:
+            continue
+        cr_full = sess_credit.get(sid, {}).get("credit", 0.0)
+        if cr_full <= 0:
+            n_zero_credit += 1
+            continue
+        meta = sess_meta.get(sid, {})
+        sess_on_day.append({
+            "session_id": sid[:12],
+            "title": (meta.get("title", "") or "")[:40],
+            "model": meta.get("model", "") or "unknown",
+            "credit": round(cr_full, 2),
+            "tokens": sum(r["tokens"] for r in day_reqs if r["session_id"] == sid),
+        })
     sess_on_day.sort(key=lambda x: x["credit"], reverse=True)
     sess_on_day_nz = [x for x in sess_on_day if x["credit"] > 0]
-    n_zero_credit = len(sess_on_day) - len(sess_on_day_nz)
+    # n_zero_credit 已在上方按"会话 credit 总额为 0"累计；此处不再重算
     # 50倍比例规则: 仅显示在当日峰值会话 credit 的 1/50 及以上的会话;
     # 峰值与最小显示值差距≤50倍, 自动隐藏个位数等噪音会话(如美团优惠券 3.75 vs 峰值 1130.78).
     top_cr = sess_on_day_nz[0]["credit"] if sess_on_day_nz else 0.0
@@ -382,13 +539,15 @@ total_input = sum(r["input"] for r in requests)
 total_output = sum(r["output"] for r in requests)
 total_cached = sum(r["cached"] for r in requests)
 total_thinking = round(sum(r["thinking_sec"] for r in requests), 1)
-total_credit = round(sum(sess_credit[s]["credit"] for s in sess_credit), 2)
+total_credit = round(sum(b["credit"] for b in day_list), 2)
 total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
 summary = {
-    "version": "1.1.1",
+    "version": "1.2.0",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+    "credit_source": credit_source,
+    "credit_note": credit_note,
     "total_requests": len(requests),
     "total_sessions": len(sess_list),
     "total_tokens": total_tokens,
@@ -403,6 +562,8 @@ summary = {
     "avg_efficiency_tok_per_sec": round(total_output / total_thinking, 1) if total_thinking else 0,
     "date_min": min(dates) if dates else None,
     "date_max": max(dates) if dates else None,
+    "credit_xlsx_date_min": xlsx_date_min,
+    "credit_xlsx_date_max": xlsx_date_max,
     "model_count": len(model_list),
 }
 
@@ -476,8 +637,10 @@ try:
     if "<!--CHART_JS-->" in tpl:
         tpl = tpl.replace("<!--CHART_JS-->", chart_tag)
 
-    # 转义 "</" 为 "<\/"，防止会话标题/模型名中的 "</script>" 冲破 script 边界（本地存储型 XSS 防护）
-    inline = '<script>window.USAGE_STATUS = ' + json.dumps(out, ensure_ascii=False).replace("</", "<\\/") + ';</script>'
+    # 转义 "<" 为 "\u003c"（OWASP 推荐的内联 JSON 做法）：彻底防止会话标题/模型名中的
+    # "</script>" 或 "</SCRIPT>"（HTML 标签名大小写不敏感）冲破 script 边界（本地存储型 XSS 防护）。
+    # "\u003c" 在 JS 字符串中仍解析为 "<"，数据值不变。
+    inline = '<script>window.USAGE_STATUS = ' + json.dumps(out, ensure_ascii=False).replace("<", "\\u003c") + ';</script>'
     if "<!--USAGE_DATA-->" in tpl:
         html = tpl.replace("<!--USAGE_DATA-->", inline)
     else:

@@ -43,6 +43,10 @@
   td.num{text-align:right;font-variant-numeric:tabular-nums;}
   .tbl-scroll{max-height:360px;overflow:auto;}
   .note{color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px;}
+  .est-badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;margin-left:8px;vertical-align:middle;font-weight:400;}
+  .est-badge.local{background:rgba(255,204,102,.15);color:var(--yellow);border:1px solid rgba(255,204,102,.4);}
+  .est-badge.precise{background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.4);}
+  .kpi .val .est{color:var(--yellow);font-weight:700;margin-left:2px;}
   .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);font-size:11px;}
   .err{color:var(--red);}
   .zero-credit{color:var(--yellow);font-size:11px;margin-left:6px;}
@@ -74,10 +78,11 @@
   <div class="kpis" id="kpis"></div>
 
   <div class="grid">
-    <div class="card"><h3 data-i18n="cardDailyCredit">每日积分消耗（credit）</h3><canvas id="cDailyTokens"></canvas></div>
+    <div class="card"><h3 data-i18n="cardDailyToken">每日 Token 消耗</h3><div class="hint" data-i18n="hintDailyToken">按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量（主角指标）。</div><canvas id="cDailyToken"></canvas></div>
     <div class="card"><h3 data-i18n="cardDailyThink">每日思考用时（小时）</h3><canvas id="cDailyThink"></canvas></div>
+    <div class="card"><h3 data-i18n="cardDailyCredit">每日积分消耗（credit）<span class="est-badge local" id="creditBadge"></span></h3><div class="hint" data-i18n="hintDailyCredit">本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不会编造到免费/无消费日）；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。</div><canvas id="cDailyCredit"></canvas></div>
     <div class="card"><h3 data-i18n="cardModelShare">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare"></canvas></div>
-    <div class="card"><h3 data-i18n="cardModelEff">各模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数，越高越“省时”</div><canvas id="cModelEff"></canvas></div>
+    <div class="card"><h3 data-i18n="cardModelEff">各模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数，越高越“省时”；仅统计样本数 ≥ 5 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff"></canvas></div>
     <div class="card full"><h3 data-i18n="cardScatter">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter">每个点=一次请求；右下方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
     <div class="card full"><h3 data-i18n="cardTopSessions">Top 10 会话</h3><div class="hint" data-i18n="hintTopSessions">会话标题 + 模型 + 思考用时 + credit 消耗</div>
       <div class="tbl-scroll"><table id="tSessions"><thead><tr>
@@ -121,7 +126,10 @@ const I18N = {
     start: "起始日期", end: "结束日期", update: "更新",
     kpiRequests: "总请求数", kpiToken: "总 Token", kpiCredit: "总 Credit", kpiThink: "思考用时", kpiEff: "平均效率", kpiErr: "错误数",
     unitHour: "小时", unitTokS: "tok/s",
-    cardDailyCredit: "每日积分消耗（credit）", cardDailyThink: "每日思考用时（小时）",
+    cardDailyToken: "每日 Token 消耗", cardDailyCredit: "每日积分消耗（credit）", cardDailyThink: "每日思考用时（小时）",
+    hintDailyToken: "按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量（主角指标）。",
+    hintDailyCredit: "本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不会编造到免费/无消费日）；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。",
+    badgeLocal: "本地估算", badgePrecise: "精确（用量导出）",
     cardModelShare: "各模型 Token 占比", cardModelEff: "各模型思考效率",
     cardScatter: "思考效率散点：思考用时 × 输出 token", cardTopSessions: "Top 10 会话",
     cardSpike: "用量高峰探查（自动定位明显高的使用日）", cardCost: "模型性价比排行（credit / 千 token）",
@@ -130,7 +138,7 @@ const I18N = {
     hintModelEff: "输出 token / 思考秒数，越高越“省时”",
     hintScatter: "每个点=一次请求；右下方=高产出低耗时=高效率",
     hintTopSessions: "会话标题 + 模型 + 思考用时 + credit 消耗",
-    hintSpike: "按 credit 排序列出最高的几天，分析：主导会话、模型 token 构成、错误率、最大单次请求。",
+    hintSpike: "按 credit 排序列出最高的几天，分析：主导会话、模型 token 构成、错误率、最大单次请求。credit 为本地估算（趋势形状），精确值见用量导出 xlsx。",
     hintCost: "按模型聚合 credit 与 token；数值越低性价比越高。",
     hintErrors: "span 级 status=error 的计数",
     thSession: "会话标题", thModel: "模型", thReq: "请求数", thToken: "Token",
@@ -148,7 +156,7 @@ const I18N = {
     spikeCredit: "credit", spikeReq: "请求", spikeSess: "会话", spikeErrRate: "错误率", spikeAvgCalls: "均 calls/请求", spikeMaxReq: "最大单请求",
     scatterModel: "模型", scatterThink: "思考", scatterOutput: "输出",
     xThink: "思考用时(秒)", yOutput: "输出 token",
-    dsCredit: "Credit", dsThink: "思考(小时)", dsErr: "错误", dsTokS: "tok/s", dsReq: "请求",
+    dsToken: "Token", dsCredit: "Credit", dsThink: "思考(小时)", dsErr: "错误", dsTokS: "tok/s", dsReq: "请求",
     lang: "EN",
   },
   en: {
@@ -157,7 +165,10 @@ const I18N = {
     start: "Start date", end: "End date", update: "Update",
     kpiRequests: "Total Requests", kpiToken: "Total Token", kpiCredit: "Total Credit", kpiThink: "Thinking Time", kpiEff: "Avg Efficiency", kpiErr: "Errors",
     unitHour: "h", unitTokS: "tok/s",
-    cardDailyCredit: "Daily Credit", cardDailyThink: "Daily Thinking Time (hours)",
+    cardDailyToken: "Daily Token Usage", cardDailyCredit: "Daily Credit", cardDailyThink: "Daily Thinking Time (hours)",
+    hintDailyToken: "Attributed by local timezone of each request's startedAt; reflects true daily token usage (hero metric).",
+    hintDailyCredit: "Local estimate: session-level credit has no per-day timestamp, attributed to the session's first-seen day by default (never fabricated onto free/zero-spend days); shape approximated, not exact. Provide a usage-export xlsx to override with precise values.",
+    badgeLocal: "Local estimate", badgePrecise: "Precise (export)",
     cardModelShare: "Token Share by Model", cardModelEff: "Thinking Efficiency by Model",
     cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
     cardSpike: "Usage Spike Explorer (auto-detect notable high-usage days)", cardCost: "Model Cost Efficiency (credit / 1k token)",
@@ -166,7 +177,7 @@ const I18N = {
     hintModelEff: "output token / think seconds; higher = more “time-saving”.",
     hintScatter: "Each point = one request; bottom-right = high output, low time = efficient.",
     hintTopSessions: "Session title + model + think time + credit.",
-    hintSpike: "Days sorted by credit, highest first; breakdown: top sessions, model token mix, error rate, largest single request.",
+    hintSpike: "Days sorted by credit, highest first; breakdown: top sessions, model token mix, error rate, largest single request. Credit is a local estimate (shape only); precise values via a usage-export xlsx.",
     hintCost: "Aggregated credit & token by model; lower = better cost efficiency.",
     hintErrors: "Count of spans with status=error.",
     thSession: "Session", thModel: "Model", thReq: "Requests", thToken: "Token",
@@ -184,7 +195,7 @@ const I18N = {
     spikeCredit: "credit", spikeReq: "reqs", spikeSess: "sess", spikeErrRate: "err", spikeAvgCalls: "avg calls/req", spikeMaxReq: "max req",
     scatterModel: "Model", scatterThink: "Think", scatterOutput: "Output",
     xThink: "Think time (s)", yOutput: "Output token",
-    dsCredit: "Credit", dsThink: "Think(h)", dsErr: "Errors", dsTokS: "tok/s", dsReq: "reqs",
+    dsToken: "Token", dsCredit: "Credit", dsThink: "Think(h)", dsErr: "Errors", dsTokS: "tok/s", dsReq: "reqs",
     lang: "中",
   }
 };
@@ -219,18 +230,28 @@ function dateMinMax(){
   const ds = T.by_day.map(d=>d.date).sort();
   return [ds[0]||'', ds[ds.length-1]||''];
 }
+// 默认展示范围：提供 xlsx 时收敛到其日期窗口（credit 精确区间），否则为全量范围。
+// 注意：这仅决定初始/重置时的选中值，筛选器边界仍是全量范围（defaultRange ≤ dateMinMax）。
+function defaultRange(){
+  const s = T.summary || {};
+  if (s.credit_xlsx_date_min && s.credit_xlsx_date_max){
+    return [s.credit_xlsx_date_min, s.credit_xlsx_date_max];
+  }
+  return dateMinMax();
+}
 function destroyCharts(){ charts.forEach(c=>c.destroy()); charts.length=0; }
 function between(v, lo, hi){ return (!lo||v>=lo) && (!hi||v<=hi); }
 
 function init(){
-  const [minD, maxD] = dateMinMax();
+  const [minD, maxD] = dateMinMax();   // 筛选器边界 = 全量数据范围
+  const [dMin, dMax] = defaultRange(); // 默认选中值 = xlsx 窗口（若提供）否则全量
   const startEl = document.getElementById('startDate');
   const endEl = document.getElementById('endDate');
-  startEl.value = minD; endEl.value = maxD;
+  startEl.value = dMin; endEl.value = dMax;
   startEl.min = minD; startEl.max = maxD;
   endEl.min = minD; endEl.max = maxD;
   document.getElementById('resetDate').addEventListener('click',()=>{
-    startEl.value = minD; endEl.value = maxD; render(minD, maxD);
+    startEl.value = dMin; endEl.value = dMax; render(dMin, dMax);
   });
   startEl.addEventListener('change',()=>{
     if(startEl.value>endEl.value) endEl.value=startEl.value;
@@ -261,7 +282,8 @@ function renderWarnings(){
 
 function render(start, end){
   const s=T.summary;
-  const hasFilter = start && end && (start!==dateMinMax()[0] || end!==dateMinMax()[1]);
+  const cs = (s && s.credit_source) || 'local_estimate';
+  const hasFilter = start && end && (start!==defaultRange()[0] || end!==defaultRange()[1]);
   const inRange = d => between(d, start, end);
 
   // 按日期筛选后的会话、请求
@@ -294,12 +316,12 @@ function render(start, end){
     {label:t('kpiToken'),val:short(kpi.tokens),unit:fmt(kpi.tokens)},
     {label:t('kpiThink'),val:kpi.thinking_hours,unit:t('unitHour')},
     {label:t('kpiEff'),val:kpi.eff,unit:t('unitTokS')},
-    {label:t('kpiCredit'),val:short(kpi.credit),unit:fmt(kpi.credit)},
+    {label:t('kpiCredit'),val:short(kpi.credit),unit:fmt(kpi.credit),est:(cs==='local_estimate')},
     {label:t('kpiErr'),val:fmt(kpi.errors),err:kpi.errors>0},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
     `<div class="kpi"><div class="label">${k.label}</div>
-     <div class="val ${k.err?'err':''}">${k.val}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div></div>`).join('');
+     <div class="val ${k.err?'err':''}">${k.val}${k.est?'<span class="est" title="本地估算">≈</span>':''}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div></div>`).join('');
 
   const dayFilt = T.by_day.filter(d => inRange(d.date));
   const grid={color:'#2a2f3a'};
@@ -309,10 +331,21 @@ function render(start, end){
 
   destroyCharts();
 
-  // 每日 credit
-  charts.push(new Chart(cDailyTokens,{type:'line',data:{labels:dayFilt.map(d=>d.date),
-    datasets:[{label:t('dsCredit'),data:dayFilt.map(d=>d.credit),borderColor:'#4f9dff',
+  // 每日 token（主角指标，本地精确）
+  charts.push(new Chart(cDailyToken,{type:'line',data:{labels:dayFilt.map(d=>d.date),
+    datasets:[{label:t('dsToken'),data:dayFilt.map(d=>d.tokens),borderColor:'#4f9dff',
       backgroundColor:'rgba(79,157,255,.15)',fill:true,tension:.3,pointRadius:2}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
+
+  // 每日 credit（估算 / 精确，取决于是否提供 xlsx）
+  const creditBadge = document.getElementById('creditBadge');
+  if (creditBadge){
+    if (cs === 'xlsx_precise'){ creditBadge.textContent = t('badgePrecise'); creditBadge.className = 'est-badge precise'; }
+    else { creditBadge.textContent = t('badgeLocal'); creditBadge.className = 'est-badge local'; }
+  }
+  charts.push(new Chart(cDailyCredit,{type:'line',data:{labels:dayFilt.map(d=>d.date),
+    datasets:[{label:t('dsCredit'),data:dayFilt.map(d=>d.credit),borderColor:'#ffcc66',
+      backgroundColor:'rgba(255,204,102,.15)',fill:true,tension:.3,pointRadius:2}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
   // 每日思考用时
@@ -465,18 +498,24 @@ function groupTokensByModel(reqs){
   });
   return Object.entries(m).map(([model,tokens])=>({model,tokens})).sort((a,b)=>b.tokens-a.tokens);
 }
+// 效率统计的最小样本数：仅用一两次任务的模型，output/thinking 比值受单点噪声主导，
+// 排名不可靠，剔除后再参与「各模型思考效率」排名。
+const MIN_EFF_SAMPLES = 5;
 function groupEffByModel(reqs){
   const m={};
   reqs.forEach(r=>{
     const model = r.model || 'unknown';
-    if(!m[model]) m[model]={model, output:0, thinking:0};
+    if(!m[model]) m[model]={model, output:0, thinking:0, count:0};
     m[model].output += r.output||0;
     m[model].thinking += r.thinking_sec||0;
+    m[model].count += 1;
   });
-  return Object.values(m).map(o=>({
-    model:o.model,
-    efficiency: o.thinking ? Math.round(o.output/o.thinking*10)/10 : 0
-  })).sort((a,b)=>b.efficiency-a.efficiency);
+  return Object.values(m)
+    .filter(o=>o.count >= MIN_EFF_SAMPLES)
+    .map(o=>({
+      model:o.model,
+      efficiency: o.thinking ? Math.round(o.output/o.thinking*10)/10 : 0
+    })).sort((a,b)=>b.efficiency-a.efficiency);
 }
 function top10others(arr){
   if(!arr.length) return {labels:['无数据'], data:[0]};
