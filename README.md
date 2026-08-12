@@ -96,6 +96,8 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 - "我想看看 workbuddy 的工作信息看板，包括 token 消耗和模型分布"
 
+> 边界：本技能**仅**响应明确指向 WorkBuddy 本机用量的请求。以下情况**不会**触发——泛指"导出我的数据 / 做个统计图表"（无 WorkBuddy 上下文）、查询其他产品（Cursor / VS Code / GitHub 等）的用量、或为任意数据生成通用看板。
+
 ### 入口 B：命令行直接跑
 
 在任意目录执行（Python 3.10+，仅标准库）：
@@ -216,7 +218,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.2.0（2026-08-10）
+当前最新版本：v1.2.1（2026-08-12）
 
 ---
 

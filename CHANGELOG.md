@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1] - 2026-08-12
+
+### 修复 · 安全审计发现（ClawHub SkillSpector）
+
+- **本地 XSS 注入（Intent-Code Divergence）**：`renderWarnings()` 曾将 `T.warnings[].detail` 直接拼入 `innerHTML`，而该字段包含被跳过的 trace 文件名（磁盘文件名可被构造注入 HTML）；会话表的 `x.status`（来自 trace 元数据）同样未转义。两处均改为经 `esc()` HTML 转义，杜绝打开看板时执行注入脚本。
+- **触发词收紧（Vague Triggers 缓解）**：原自然语言触发过宽，存在误触发 / 触发劫持风险。将触发范围明确收束到「仅 WorkBuddy 自身本机用量」，并在 SKILL.md / README 增加显式负面清单（泛指统计图表、其他产品用量、任意数据通用看板均不触发）。
+
 ## [1.2.0] - 2026-08-10
 
 ### 改进 · Token 与 Credit 的权重和分析思路

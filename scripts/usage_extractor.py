@@ -544,7 +544,7 @@ total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
 summary = {
-    "version": "1.2.0",
+    "version": "1.2.1",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,

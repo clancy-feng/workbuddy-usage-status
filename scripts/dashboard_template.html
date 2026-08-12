@@ -284,7 +284,7 @@ function init(){
 function renderWarnings(){
   const el = document.getElementById('dataWarn');
   if (!el || !T || !T.warnings || !T.warnings.length) return;
-  el.innerHTML = '⚠ ' + T.warnings.map(w => w.detail).join('<br>⚠ ');
+  el.innerHTML = '⚠ ' + T.warnings.map(w => esc(w.detail)).join('<br>⚠ ');
   el.style.display = 'block';
 }
 
@@ -467,7 +467,7 @@ function render(start, end){
     <td class="num">${(x.thinking_sec/60).toFixed(1)}</td>
     <td class="num">${x.credit}</td>
     <td class="num ${x.errors?'err':''}">${x.errors}</td>
-    <td>${x.status||''}</td></tr>`).join('');
+    <td>${esc(x.status||'')}</td></tr>`).join('');
 
   // 模型性价比表（按会话级 model，受日期筛选影响）
   const costMap = {};

@@ -2,11 +2,11 @@
 name: "workbuddy-usage-status"
 slug: workbuddy-usage-status
 displayName: "WorkBuddy 使用状态看板"
-version: 1.2.0
-description: "离线可视化 WorkBuddy 本机使用数据（以 token 消耗为主指标，credit 为本地估算；思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。当用户想查看、生成或导出 WorkBuddy 使用状态 / 使用统计 / 工作信息看板时调用。纯本地、零外网依赖、可搬运。可选 --credit-xlsx 用用量导出精确覆盖 credit。 EN: Offline dashboard for WorkBuddy local usage analytics (token as primary metric, credit as local estimate; thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection). Triggers when the user wants to view, generate, or export their WorkBuddy usage status / stats / activity dashboard. Fully local, zero network dependency, portable. Optional --credit-xlsx overrides credit with precise export values."
+version: 1.2.1
+description: "离线可视化 WorkBuddy 本机使用数据（以 token 消耗为主指标，credit 为本地估算；思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。仅当用户**明确**想查看、生成或导出**自己 WorkBuddy 本机/本账号**的使用状态 / 使用统计 / 工作信息看板时调用；不用于其他产品或系统的用量统计，也不为任意数据生成通用看板。纯本地、零外网依赖、可搬运。可选 --credit-xlsx 用用量导出精确覆盖 credit。 EN: Offline dashboard for WorkBuddy local usage analytics (token as primary metric, credit as local estimate; thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection). Triggers only when the user explicitly wants to view, generate, or export their own WorkBuddy local/account usage status / stats / activity dashboard; not for other products' usage analytics, nor for building generic dashboards from arbitrary data. Fully local, zero network dependency, portable. Optional --credit-xlsx overrides credit with precise export values."
 agent_created: true
 license: MIT
-summary: "离线可视化 WorkBuddy 本机使用数据（以 token 消耗为主指标，credit 为本地估算；思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。当用户想查看、生成或导出 WorkBuddy 使用状态 / 使用统计 / 工作信息看板时调用。纯本地、零外网依赖、可搬运。可选 --credit-xlsx 用用量导出精确覆盖 credit。 EN: Offline dashboard for WorkBuddy local usage analytics (token as primary metric, credit as local estimate; thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection). Triggers when the user wants to view, generate, or export their WorkBuddy usage status / stats / activity dashboard. Fully local, zero network dependency, portable. Optional --credit-xlsx overrides credit with precise export values."
+summary: "离线可视化 WorkBuddy 本机使用数据（以 token 消耗为主指标，credit 为本地估算；思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查），生成本地使用信息看板。仅当用户**明确**想查看、生成或导出**自己 WorkBuddy 本机/本账号**的使用状态 / 使用统计 / 工作信息看板时调用；不用于其他产品或系统的用量统计，也不为任意数据生成通用看板。纯本地、零外网依赖、可搬运。可选 --credit-xlsx 用用量导出精确覆盖 credit。 EN: Offline dashboard for WorkBuddy local usage analytics (token as primary metric, credit as local estimate; thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection). Triggers only when the user explicitly wants to view, generate, or export their own WorkBuddy local/account usage status / stats / activity dashboard; not for other products' usage analytics, nor for building generic dashboards from arbitrary data. Fully local, zero network dependency, portable. Optional --credit-xlsx overrides credit with precise export values."
 allowed-tools: python3, read_file, write_file
 metadata:
   clawdbot:
@@ -23,11 +23,17 @@ metadata:
 
 ## 触发条件
 
-当用户表达以下意图时调用本技能（description 已含触发词，此处强化判断）：
+当用户**明确指向 WorkBuddy 自身**、表达以下意图时调用本技能（description 已含触发词，此处强化判断与收紧边界）：
 
-- 想查看 / 生成 / 导出自己的 WorkBuddy 使用统计、工作量、成本看板；
-- 关心 token 消耗、模型分布与性价比、思考效率、错误监控、用量高峰日等任一维度；
-- 想对账某段时间的积分（credit）花费。
+- 想查看 / 生成 / 导出**自己的 WorkBuddy** 使用统计、工作量、成本看板；
+- 关心 token 消耗、模型分布与性价比、思考效率、错误监控、用量高峰日等任一维度（特指 WorkBuddy 本机 trace 数据）；
+- 想对账某段时间的积分（credit）花费（WorkBuddy 用量）。
+
+**不触发（边界）**：即使措辞相似，以下情况也不应激活，避免误触发 / 触发劫持：
+
+- 泛指"导出我的数据 / 做个统计图表 / 生成看板"，但未明确指向 WorkBuddy 本机用量；
+- 查看 / 统计**其他产品**（Cursor、VS Code、GitHub、Claude 等）或任意第三方系统的用量、埋点、分析；
+- 为任意数据集生成通用可视化 / 报表（本技能只读 `~/.workbuddy`，不具备通用图表能力）。
 
 ## 执行步骤
 
