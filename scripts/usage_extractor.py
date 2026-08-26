@@ -428,12 +428,12 @@ model_cost_list = []
 for mc in model_cost.values():
     if mc["model"] == "unknown" or mc["tokens"] <= 0:
         continue
-    c1k = (mc["credit"] / mc["tokens"] * 1000.0) if mc["tokens"] else 0.0
-    mc["credit_per_1k"] = round(c1k, 5)
+    c1k = (mc["credit"] / mc["tokens"] * 100000.0) if mc["tokens"] else 0.0
+    mc["credit_per_100k"] = round(c1k, 2)
     # 标记限时免费/促销模型：credit 为 0 但 token 不少（可能 WorkBuddy 内部倍率为 0）
     mc["zero_credit"] = (mc["credit"] <= 0.0 and mc["tokens"] >= 1_000_000)
     model_cost_list.append(mc)
-model_cost_list.sort(key=lambda x: x["credit_per_1k"])
+model_cost_list.sort(key=lambda x: x["credit_per_100k"])
 
 # 优化建议: 在可比任务量(≥1000万token)的通用模型间, 比较最便宜与最贵
 model_tips = []
@@ -446,21 +446,21 @@ substantial = [
     and m["credit"] > 0.0          # 排除限时免费/促销模型，避免把“当前零成本”当成长期基准
 ]
 if len(substantial) >= 2:
-    cheapest = min(substantial, key=lambda x: x["credit_per_1k"])
-    priciest = max(substantial, key=lambda x: x["credit_per_1k"])
-    if priciest["credit_per_1k"] > 0:
-        save = (priciest["credit_per_1k"] - cheapest["credit_per_1k"]) / priciest["credit_per_1k"] * 100
+    cheapest = min(substantial, key=lambda x: x["credit_per_100k"])
+    priciest = max(substantial, key=lambda x: x["credit_per_100k"])
+    if priciest["credit_per_100k"] > 0:
+        save = (priciest["credit_per_100k"] - cheapest["credit_per_100k"]) / priciest["credit_per_100k"] * 100
         if save >= 5:
             model_tips.append(
                 f"在可比任务量下(均≥1000万token)，切换至「{cheapest['model']}」"
-                f"(credit/1k={cheapest['credit_per_1k']}) 相比「{priciest['model']}」"
-                f"(credit/1k={priciest['credit_per_1k']}) 预计节省约 {save:.0f}% 的 credit；"
+                f"(credit/10万token={cheapest['credit_per_100k']}) 相比「{priciest['model']}」"
+                f"(credit/10万token={priciest['credit_per_100k']}) 预计节省约 {save:.0f}% 的 credit；"
                 f"前提是两个模型处理的工作负载可互相迁移。")
 # 单独提示零 credit 模型
 for m in model_cost_list:
     if m["zero_credit"] and m["tokens"] >= 10_000_000:
         model_tips.append(
-            f"「{m['model']}」当前 credit/1k=0（消耗 credit {m['credit']:.2f}），"
+            f"「{m['model']}」当前 credit/10万token=0（消耗 credit {m['credit']:.2f}），"
             f"可能处于限免/促销期；不建议把它作为长期成本基准。")
 
 # ---------- 2.7 用量高峰探查 (非异常判定, 仅定位高用量日并拆解成因) ----------
@@ -469,47 +469,49 @@ for m in model_cost_list:
 # 精确到天(而非模糊窗口), 因为图里看不出哪天用得最多。
 print("[2.7] 用量高峰探查 ...", flush=True)
 daily_credit = {b["date"]: b["credit"] for b in day_list if b["date"] != "unknown"}
-cr_vals = sorted(daily_credit.values())
-median_cr = cr_vals[len(cr_vals) // 2] if cr_vals else 0.0
-thr = max(median_cr * 2.0, 50.0)          # 高于中位数 2 倍才算"明显高"
-cand = sorted([(d, v) for d, v in daily_credit.items() if v >= thr],
+# 排序改为按当天 token 总量（请求级精确到天）；credit 归首日估算不精确，不作排序依据。
+daily_tokens = {}
+for r in requests:
+    if r["date"] != "unknown":
+        daily_tokens[r["date"]] = daily_tokens.get(r["date"], 0) + r["tokens"]
+tok_vals = sorted(daily_tokens.values())
+median_tok = tok_vals[len(tok_vals) // 2] if tok_vals else 0
+thr = max(median_tok * 2.0, 5_000_000)     # 高于中位数 2 倍才算"明显高"，兜底 500 万 token
+cand = sorted([(d, v) for d, v in daily_tokens.items() if v >= thr],
               key=lambda x: x[1], reverse=True)
 top_days = [d for d, _ in cand[:6]]
 if len(top_days) < 3:                      # 兜底: 样本不足时也至少给 top3
-    top_days = [d for d, _ in sorted(daily_credit.items(), key=lambda x: x[1], reverse=True)[:3]]
+    top_days = [d for d, _ in sorted(daily_tokens.items(), key=lambda x: x[1], reverse=True)[:3]]
 
 spike_days = []
 for d in top_days:
     day_reqs = [r for r in requests if r["date"] == d]
-    sess_ids = {r["session_id"] for r in day_reqs if r["session_id"]}
-    # 与每日 credit 口径一致(归首日)：spike 日 d 的 credit 来自「首次出现在 d 的会话」，
-    # 列出这些会话并展示其会话级全额 credit(不按 token 二次拆分，避免把 credit 编造到免费日子)。
-    sess_on_day = []
-    n_zero_credit = 0
-    for sid in sess_ids:
-        if sess_first.get(sid) != d:
+    # 当天有请求的全部会话（不再限首日）：model=当天实际请求模型（按 token 取主要），token=当天请求 token 之和。
+    # 会话表的 token 口径与「模型 token 构成」一致（都是当天全部请求），左右可对账。
+    sess_tok = {}
+    sess_mdl = {}
+    for r in day_reqs:
+        sid = r["session_id"]
+        if not sid:
             continue
-        cr_full = sess_credit.get(sid, {}).get("credit", 0.0)
-        if cr_full <= 0:
-            n_zero_credit += 1
-            continue
+        sess_tok[sid] = sess_tok.get(sid, 0) + r["tokens"]
+        sess_mdl.setdefault(sid, {})
+        sess_mdl[sid][r["model"]] = sess_mdl[sid].get(r["model"], 0) + r["tokens"]
+    day_sess = []
+    for sid, tok in sess_tok.items():
         meta = sess_meta.get(sid, {})
-        sess_on_day.append({
+        mdl_order = sorted(sess_mdl.get(sid, {}).items(), key=lambda kv: -kv[1])
+        model_str = ", ".join(m for m, _ in mdl_order) if mdl_order else "unknown"
+        day_sess.append({
             "session_id": sid[:12],
             "title": (meta.get("title", "") or "")[:40],
-            "model": meta.get("model", "") or "unknown",
-            "credit": round(cr_full, 2),
-            "tokens": sum(r["tokens"] for r in day_reqs if r["session_id"] == sid),
+            "model": model_str,           # 当天实际请求的全部模型（按 token 降序），与右侧构成对齐
+            "tokens": tok,
         })
-    sess_on_day.sort(key=lambda x: x["credit"], reverse=True)
-    sess_on_day_nz = [x for x in sess_on_day if x["credit"] > 0]
-    # n_zero_credit 已在上方按"会话 credit 总额为 0"累计；此处不再重算
-    # 50倍比例规则: 仅显示在当日峰值会话 credit 的 1/50 及以上的会话;
-    # 峰值与最小显示值差距≤50倍, 自动隐藏个位数等噪音会话(如美团优惠券 3.75 vs 峰值 1130.78).
-    top_cr = sess_on_day_nz[0]["credit"] if sess_on_day_nz else 0.0
-    ratio_thr = top_cr / 50.0
-    shown_sessions = [x for x in sess_on_day_nz if x["credit"] >= ratio_thr]
-    n_small_credit = len(sess_on_day_nz) - len(shown_sessions)
+    day_sess.sort(key=lambda x: x["tokens"], reverse=True)
+    shown_sessions = day_sess[:8]
+    n_hidden = max(0, len(day_sess) - 8)
+    hidden_tokens = sum(x["tokens"] for x in day_sess[8:])
     mdl = {}
     for r in day_reqs:
         mdl[r["model"]] = mdl.get(r["model"], 0) + r["tokens"]
@@ -520,18 +522,18 @@ for d in top_days:
     max_tok = max((r["tokens"] for r in day_reqs), default=0)
     spike_days.append({
         "date": d,
-        "credit": round(daily_credit[d], 2),
+        "tokens": sum(r["tokens"] for r in day_reqs),
+        "credit": round(daily_credit.get(d, 0.0), 2),   # 归首日估算，仅作参考
         "requests": n,
-        "sessions": len(sess_ids),
+        "sessions": len(sess_tok),
         "errors": errs,
         "err_rate": round(errs / n * 100, 1) if n else 0.0,
         "avg_calls": round(calls / n, 1) if n else 0.0,
         "max_request_tokens": max_tok,
         "model_token_top": [{"model": m, "tokens": t} for m, t in mdl_sorted],
-        "top_sessions": shown_sessions[:8],
-        "n_zero_credit": n_zero_credit,
-        "n_small_credit": n_small_credit,
-        "ratio_threshold": round(ratio_thr, 2),
+        "top_sessions": shown_sessions,
+        "n_hidden": n_hidden,
+        "hidden_tokens": hidden_tokens,
     })
 
 total_tokens = sum(r["tokens"] for r in requests)
@@ -544,7 +546,7 @@ total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
 summary = {
-    "version": "1.2.1",
+    "version": "1.2.5",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -622,7 +624,9 @@ with open(OUT_JS, "w", encoding="utf-8") as f:
 # 自包含 HTML: 把数据 + Chart.js 都内联进模板, 去掉所有外部依赖(预览/双击均可离线打开)
 TPL = os.path.join(SCRIPT_DIR, "dashboard_template.html")
 CHART_JS = os.path.join(SCRIPT_DIR, "chart.umd.min.js")
-OUT_HTML = os.path.join(OUT_DIR, "workbuddy-usage-status-dashboard.html")
+# 自包含 HTML 文件名带时间戳：每次生成独立文件，不覆盖旧报告，便于保留多份对比。
+OUT_HTML = os.path.join(OUT_DIR, "workbuddy-usage-status-dashboard-"
+                        + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".html")
 try:
     tpl = open(TPL, "r", encoding="utf-8").read()
 

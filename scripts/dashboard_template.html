@@ -40,7 +40,7 @@
   table{width:100%;border-collapse:collapse;font-size:12px;}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
   th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);}
-  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.num{text-align:left;font-variant-numeric:tabular-nums;}
   .tbl-scroll{max-height:360px;overflow:auto;}
   .note{color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px;}
   .est-badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;margin-left:8px;vertical-align:middle;font-weight:400;}
@@ -73,18 +73,17 @@
   <div class="filter-bar">
     <label data-i18n="start">起始日期 <input type="date" id="startDate"></label>
     <label data-i18n="end">结束日期 <input type="date" id="endDate"></label>
-    <button id="resetDate" data-i18n="update">更新</button>
   </div>
 
   <div class="kpis" id="kpis"></div>
 
   <div class="grid">
-    <div class="card"><h3 data-i18n="cardDailyToken">每日 Token 消耗</h3><div class="hint" data-i18n="hintDailyToken">按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量（主角指标）。</div><canvas id="cDailyToken"></canvas></div>
+    <div class="card"><h3 data-i18n="cardDailyToken">每日 Token 消耗</h3><div class="hint" data-i18n="hintDailyToken">按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。</div><canvas id="cDailyToken"></canvas></div>
     <div class="card"><h3 data-i18n="cardDailyThink">每日思考用时（小时）</h3><canvas id="cDailyThink"></canvas></div>
-    <div class="card"><h3 data-i18n="cardDailyCredit">每日积分消耗（credit）<span class="est-badge local" id="creditBadge"></span></h3><div class="hint" data-i18n="hintDailyCredit">本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不会编造到免费/无消费日）；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。</div><canvas id="cDailyCredit"></canvas></div>
+    <div class="card"><h3 data-i18n="cardDailyCredit">每日积分消耗（credit）<span class="est-badge local" id="creditBadge"></span></h3><div class="hint" data-i18n="hintDailyCredit">本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。</div><canvas id="cDailyCredit"></canvas></div>
     <div class="card"><h3 data-i18n="cardModelShare">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare"></canvas></div>
-    <div class="card"><h3 data-i18n="cardModelEff">主要模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数，越高越“省时”；仅统计样本数 ≥ 10 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff"></canvas></div>
-    <div class="card"><h3 data-i18n="cardScatter">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter">每个点=一次请求；右下方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
+    <div class="card"><h3 data-i18n="cardModelEff">主要模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数；仅统计样本数 ≥ 10 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff"></canvas></div>
+    <div class="card"><h3 data-i18n="cardScatter">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter">每个点=一次请求；左上方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
     <div class="card full"><h3 data-i18n="cardTopSessions">Top 10 会话</h3><div class="hint" data-i18n="hintTopSessions">会话标题 + 模型 + 思考用时 + credit 消耗</div>
       <div class="tbl-scroll"><table id="tSessions"><thead><tr>
         <th data-i18n="thSession">会话标题</th><th data-i18n="thModel">模型</th><th class="num" data-i18n="thReq">请求数</th><th class="num" data-i18n="thToken">Token</th>
@@ -92,14 +91,14 @@
       </tr></thead><tbody></tbody></table></div>
     </div>
     <div class="card full" id="spikeCard">
-      <h3 data-i18n="cardSpike">用量高峰探查（自动定位明显高的使用日）</h3>
-      <div class="hint" data-i18n="hintSpike">按 credit 排序列出最高的几天，分析：主导会话、模型 token 构成、错误率、最大单次请求。</div>
+      <h3 data-i18n="cardSpike">用量高峰探查</h3>
+      <div class="hint" data-i18n="hintSpike">按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。会话表与模型构成均按当天请求统计，模型为当天实际请求模型。</div>
       <div id="spikeDays"></div>
     </div>
-    <div class="card full"><h3 data-i18n="cardCost">模型性价比排行（credit / 千 token）</h3><div class="hint" data-i18n="hintCost">按模型聚合 credit 与 token；数值越低性价比越高。</div>
+    <div class="card full"><h3 data-i18n="cardCost">模型性价比排行（credit / 10万 token）</h3><div class="hint" data-i18n="hintCost">按模型聚合 credit 与 token；数值越低性价比越高。credit 与 token 均按会话主模型归因，会话内跨模型使用时数值存在归因偏差；credit 为 WorkBuddy 积分而非人民币。</div>
       <div class="tbl-scroll"><table id="tModelCost"><thead><tr>
         <th data-i18n="thModel2">模型</th><th class="num" data-i18n="thSessions">会话数</th><th class="num" data-i18n="thTotalToken">总 Token</th>
-        <th class="num" data-i18n="thTotalCredit">总 Credit</th><th class="num" data-i18n="thCostPer1k">Credit / 1k token</th>
+        <th class="num" data-i18n="thTotalCredit">总 Credit</th><th class="num" data-i18n="thCostPer100k">Credit / 1k token</th>
       </tr></thead><tbody></tbody></table></div>
       <div class="note" id="modelTips"></div>
     </div>
@@ -131,36 +130,36 @@ const I18N = {
   zh: {
     title: "Workbuddy使用数据看板",
     subGenerated: "生成时间", subRange: "数据范围", subFilter: "筛选范围", subReq: "请求", subSess: "会话", subModel: "模型", subGran: "聚合粒度",
-    start: "起始日期", end: "结束日期", update: "更新",
+    start: "起始日期", end: "结束日期",
     kpiRequests: "总请求数", kpiToken: "总 Token", kpiCredit: "总 Credit", kpiThink: "思考用时", kpiEff: "平均效率", kpiErr: "错误数",
     unitHour: "小时", unitTokS: "tok/s",
     cardDailyToken: "每日 Token 消耗", cardDailyCredit: "每日积分消耗（credit）", cardDailyThink: "每日思考用时（小时）",
-    hintDailyToken: "按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量（主角指标）。",
-    hintDailyCredit: "本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不会编造到免费/无消费日）；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。",
+    hintDailyToken: "按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。",
+    hintDailyCredit: "本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。",
     badgeLocal: "本地估算", badgePrecise: "精确（用量导出）",
     cardModelShare: "各模型 Token 占比", cardModelEff: "主要模型思考效率",
     cardScatter: "思考效率散点：思考用时 × 输出 token", cardTopSessions: "Top 10 会话",
-    cardSpike: "用量高峰探查（自动定位明显高的使用日）", cardCost: "模型性价比排行（credit / 千 token）",
+    cardSpike: "用量高峰探查", cardCost: "模型性价比排行（credit / 10万 token）",
     cardErrors: "每日错误数",
     hintModelShare: "按模型名称聚合，Top10 之外合并为「其他」",
-    hintModelEff: "输出 token / 思考秒数，越高越“省时”",
-    hintScatter: "每个点=一次请求；右下方=高产出低耗时=高效率",
+    hintModelEff: "输出 token / 思考秒数",
+    hintScatter: "每个点=一次请求；左上方=高产出低耗时=高效率",
     hintTopSessions: "会话标题 + 模型 + 思考用时 + credit 消耗",
-    hintSpike: "按 credit 排序列出最高的几天，分析：主导会话、模型 token 构成、错误率、最大单次请求。credit 为本地估算（趋势形状），精确值见用量导出 xlsx。",
-    hintCost: "按模型聚合 credit 与 token；数值越低性价比越高。",
+    hintSpike: "按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。会话表与模型构成均按当天请求统计，模型为当天实际请求模型。",
+    hintCost: "按模型聚合 credit 与 token；数值越低性价比越高。credit 与 token 均按会话主模型归因，会话内跨模型使用时数值存在归因偏差；credit 为 WorkBuddy 积分而非人民币。",
     hintErrors: "span 级 status=error 的计数",
     thSession: "会话标题", thModel: "模型", thReq: "请求数", thToken: "Token",
     thThink: "思考(分)", thCredit: "Credit", thErr: "错误", thStatus: "状态",
-    thModel2: "模型", thSessions: "会话数", thTotalToken: "总 Token", thTotalCredit: "总 Credit", thCostPer1k: "Credit / 1k token",
-    tipOptimize: (c,cv,p,pv,s)=>`优化建议：在可比任务量下，切换至「${c}」(credit/1k=${cv}) 相比「${p}」(credit/1k=${pv}) 预计节省约 ${s}% credit。`,
-    tipPromo: (m)=>`提示：「${m}」当前 credit/1k=0，可能处于限免/促销期，不建议作为长期成本基准。`,
+    thModel2: "模型", thSessions: "会话数", thTotalToken: "总 Token", thTotalCredit: "总 Credit", thCostPer100k: "Credit / 10万 token",
+    tipOptimize: (c,cv,p,pv,s)=>`优化建议：在可比任务量下，切换至「${c}」(credit/10万token=${cv}) 相比「${p}」(credit/10万token=${pv}) 预计节省约 ${s}% credit。`,
+    tipPromo: (m)=>`提示：「${m}」当前 credit/10万token=0，可能处于限免/促销期，不建议作为长期成本基准。`,
     tipNoModel: "提示：当前筛选范围内可比模型样本不足，暂无可生成的切换建议；或多数会话为 auto / unknown。",
     emptyCost: "无模型级数据（trace 均未携带 sessionId）",
     bottomNote: "报告数据说明见 data-guide.md",
     spikeNoData: "无显著高用量日。",
-    spikeSubSessions: "主导会话（按当日 credit）", spikeSubModel: "模型 token 构成（Top5）",
+    spikeSubSessions: "当天会话（按 token）", spikeSubModel: "模型 token Top5构成",
     spikeNone: "无",
-    spikeHidden: (z,s)=>`另有 ${z} 个零积分会话 + ${s} 个不足峰值 1/50 的小额会话，未列入上表。`,
+    spikeHidden: (n,tok)=>`另有 ${n} 个会话（合计 ${tok} token）未列入上表。`,
     spikeCredit: "credit", spikeReq: "请求", spikeSess: "会话", spikeErrRate: "错误率", spikeAvgCalls: "均 calls/请求", spikeMaxReq: "最大单请求",
     scatterModel: "模型", scatterThink: "思考", scatterOutput: "输出",
     xThink: "思考用时(秒)", yOutput: "输出 token",
@@ -170,36 +169,36 @@ const I18N = {
   en: {
     title: "WorkBuddy Usage Data Dashboard",
     subGenerated: "Generated", subRange: "Range", subFilter: "Filtered", subReq: "reqs", subSess: "sessions", subModel: "models", subGran: "Granularity",
-    start: "Start date", end: "End date", update: "Update",
+    start: "Start date", end: "End date",
     kpiRequests: "Total Requests", kpiToken: "Total Token", kpiCredit: "Total Credit", kpiThink: "Thinking Time", kpiEff: "Avg Efficiency", kpiErr: "Errors",
     unitHour: "h", unitTokS: "tok/s",
     cardDailyToken: "Daily Token Usage", cardDailyCredit: "Daily Credit", cardDailyThink: "Daily Thinking Time (hours)",
-    hintDailyToken: "Attributed by local timezone of each request's startedAt; reflects true daily token usage (hero metric).",
-    hintDailyCredit: "Local estimate: session-level credit has no per-day timestamp, attributed to the session's first-seen day by default (never fabricated onto free/zero-spend days); shape approximated, not exact. Provide a usage-export xlsx to override with precise values.",
+    hintDailyToken: "Attributed by local timezone of each request's startedAt; reflects true daily token usage.",
+    hintDailyCredit: "Local estimate: session-level credit has no per-day timestamp, attributed to the session's first-seen day by default; shape approximated, not exact. Provide a usage-export xlsx to override with precise values.",
     badgeLocal: "Local estimate", badgePrecise: "Precise (export)",
     cardModelShare: "Token Share by Model", cardModelEff: "Primary Model Thinking Efficiency",
     cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
-    cardSpike: "Usage Spike Explorer (auto-detect notable high-usage days)", cardCost: "Model Cost Efficiency (credit / 1k token)",
+    cardSpike: "Usage Spike Explorer", cardCost: "Model Cost Efficiency (credit / 100k token)",
     cardErrors: "Daily Errors",
     hintModelShare: "Aggregated by model name; Top10 merged into “Others”.",
-    hintModelEff: "output token / think seconds; higher = more “time-saving”.",
-    hintScatter: "Each point = one request; bottom-right = high output, low time = efficient.",
+    hintModelEff: "output token / think seconds",
+    hintScatter: "Each point = one request; top-left = high output, low time = efficient.",
     hintTopSessions: "Session title + model + think time + credit.",
-    hintSpike: "Days sorted by credit, highest first; breakdown: top sessions, model token mix, error rate, largest single request. Credit is a local estimate (shape only); precise values via a usage-export xlsx.",
-    hintCost: "Aggregated credit & token by model; lower = better cost efficiency.",
+    hintSpike: "Days sorted by daily token total, highest first; breakdown: sessions on that day, model token mix, error rate, largest single request. Session table and model mix are both counted from that day's requests, with the actual request model.",
+    hintCost: "Credit & token aggregated by session primary model; lower = better cost efficiency. Cross-model sessions introduce attribution bias; credit is WorkBuddy internal credits, not currency.",
     hintErrors: "Count of spans with status=error.",
     thSession: "Session", thModel: "Model", thReq: "Requests", thToken: "Token",
     thThink: "Think(min)", thCredit: "Credit", thErr: "Err", thStatus: "Status",
-    thModel2: "Model", thSessions: "Sessions", thTotalToken: "Total Token", thTotalCredit: "Total Credit", thCostPer1k: "Credit / 1k token",
-    tipOptimize: (c,cv,p,pv,s)=>`Tip: for comparable workloads, switching to "${c}" (credit/1k=${cv}) vs "${p}" (credit/1k=${pv}) could save ~${s}% credit.`,
-    tipPromo: (m)=>`Note: "${m}" current credit/1k=0, likely in free/promo period; not a reliable long-term cost baseline.`,
+    thModel2: "Model", thSessions: "Sessions", thTotalToken: "Total Token", thTotalCredit: "Total Credit", thCostPer100k: "Credit / 100k token",
+    tipOptimize: (c,cv,p,pv,s)=>`Tip: for comparable workloads, switching to "${c}" (credit/100k=${cv}) vs "${p}" (credit/100k=${pv}) could save ~${s}% credit.`,
+    tipPromo: (m)=>`Note: "${m}" current credit/100k=0, likely in free/promo period; not a reliable long-term cost baseline.`,
     tipNoModel: "Note: insufficient comparable models in current range, or most sessions are auto / unknown.",
     emptyCost: "No model-level data (traces lack sessionId).",
     bottomNote: "See data-guide.md for data definitions.",
     spikeNoData: "No notable high-usage days.",
-    spikeSubSessions: "Top Sessions (by daily credit)", spikeSubModel: "Model Token Mix (Top5)",
+    spikeSubSessions: "Sessions on Day (by token)", spikeSubModel: "Model Token Top5 Mix",
     spikeNone: "None",
-    spikeHidden: (z,s)=>`${z} zero-credit sessions + ${s} small sessions below 1/50 of peak are hidden from the table.`,
+    spikeHidden: (n,tok)=>`${n} more sessions (${tok} tokens total) are hidden.`,
     spikeCredit: "credit", spikeReq: "reqs", spikeSess: "sess", spikeErrRate: "err", spikeAvgCalls: "avg calls/req", spikeMaxReq: "max req",
     scatterModel: "Model", scatterThink: "Think", scatterOutput: "Output",
     xThink: "Think time (s)", yOutput: "Output token",
@@ -258,9 +257,6 @@ function init(){
   startEl.value = dMin; endEl.value = dMax;
   startEl.min = minD; startEl.max = maxD;
   endEl.min = minD; endEl.max = maxD;
-  document.getElementById('resetDate').addEventListener('click',()=>{
-    startEl.value = dMin; endEl.value = dMax; render(dMin, dMax);
-  });
   startEl.addEventListener('change',()=>{
     if(startEl.value>endEl.value) endEl.value=startEl.value;
     render(startEl.value, endEl.value);
@@ -373,7 +369,7 @@ function render(start, end){
     {label:t('kpiToken'),val:short(kpi.tokens),unit:fmt(kpi.tokens)},
     {label:t('kpiThink'),val:kpi.thinking_hours,unit:t('unitHour')},
     {label:t('kpiEff'),val:kpi.eff,unit:t('unitTokS')},
-    {label:t('kpiCredit'),val:short(kpi.credit),unit:fmt(kpi.credit),est:(cs==='local_estimate')},
+    {label:t('kpiCredit'),val:short(kpi.credit)},
     {label:t('kpiErr'),val:fmt(kpi.errors),err:kpi.errors>0},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
@@ -480,23 +476,24 @@ function render(start, end){
   });
   let costList = Object.values(costMap)
     .filter(m => m.model !== 'unknown' && m.tokens > 0)
-    .map(m => ({...m, credit_per_1k: m.tokens ? Math.round(m.credit/m.tokens*100000)/100 : 0}));
-  costList.sort((a,b)=>a.credit_per_1k - b.credit_per_1k);
+    .map(m => ({...m, credit_per_100k: m.tokens ? Math.round(m.credit/m.tokens*1e7)/100 : 0}))
+    .filter(m => m.credit_per_100k > 0);  // 0 值行（免费/未计费模型）无性价比意义，不展示
+  costList.sort((a,b)=>a.credit_per_100k - b.credit_per_100k);
 
   const tmc = document.querySelector('#tModelCost tbody');
   if (costList.length) {
-    const best = Math.min.apply(null, costList.map(m => m.credit_per_1k));
-    const worst = Math.max.apply(null, costList.map(m => m.credit_per_1k));
+    const best = Math.min.apply(null, costList.map(m => m.credit_per_100k));
+    const worst = Math.max.apply(null, costList.map(m => m.credit_per_100k));
     tmc.innerHTML = costList.map(m => {
-      const col = (m.credit_per_1k === best) ? 'var(--green)'
-                : (m.credit_per_1k === worst) ? 'var(--red)' : '';
+      const col = (m.credit_per_100k === best) ? 'var(--green)'
+                : (m.credit_per_100k === worst) ? 'var(--red)' : '';
       const promo = (m.credit === 0 && m.tokens >= 1_000_000) ? '<span class="zero-credit">(限免/促销)</span>' : '';
       return `<tr>
         <td><span class="tag">${esc(m.model)}</span>${promo}</td>
         <td class="num">${m.sessions}</td>
         <td class="num">${fmt(m.tokens)}</td>
         <td class="num">${m.credit.toFixed(2)}</td>
-        <td class="num" style="color:${col};font-weight:600">${m.credit_per_1k}</td>
+        <td class="num" style="color:${col};font-weight:600">${m.credit_per_100k}</td>
       </tr>`;
     }).join('');
   } else {
@@ -512,10 +509,10 @@ function render(start, end){
   );
   let tipsHtml = '';
   if (substantial.length >= 2) {
-    const cheapest = substantial.reduce((a,b)=>a.credit_per_1k<b.credit_per_1k?a:b);
-    const priciest = substantial.reduce((a,b)=>a.credit_per_1k>b.credit_per_1k?a:b);
-    const save = priciest.credit_per_1k ? ((priciest.credit_per_1k - cheapest.credit_per_1k)/priciest.credit_per_1k*100) : 0;
-    tipsHtml += t('tipOptimize')(esc(cheapest.model), cheapest.credit_per_1k, esc(priciest.model), priciest.credit_per_1k, save.toFixed(0));
+    const cheapest = substantial.reduce((a,b)=>a.credit_per_100k<b.credit_per_100k?a:b);
+    const priciest = substantial.reduce((a,b)=>a.credit_per_100k>b.credit_per_100k?a:b);
+    const save = priciest.credit_per_100k ? ((priciest.credit_per_100k - cheapest.credit_per_100k)/priciest.credit_per_100k*100) : 0;
+    tipsHtml += t('tipOptimize')(esc(cheapest.model), cheapest.credit_per_100k, esc(priciest.model), priciest.credit_per_100k, save.toFixed(0));
   }
   const zeroPromo = costList.filter(m => m.credit===0 && m.tokens>=1_000_000);
   zeroPromo.forEach(m=>{
@@ -530,7 +527,7 @@ function render(start, end){
   renderSpikeDays();
 }
 
-// 用量高峰探查: 渲染按 credit 排序最高的几天, 逐日拆解成因(不受日期筛选影响, 始终基于全量)
+// 用量高峰探查: 渲染按当天 token 总量排序最高的几天, 逐日拆解成因(不受日期筛选影响, 始终基于全量)
 function renderSpikeDays(){
   const host = document.getElementById('spikeDays');
   if(!host) return;
@@ -539,12 +536,12 @@ function renderSpikeDays(){
   host.innerHTML = arr.map(s => {
     const sessRows = (s.top_sessions || []).map(x =>
       `<tr><td>${esc(x.title || '(无标题)')}</td><td><span class="tag">${esc(x.model)}</span></td>
-        <td class="num">${x.credit.toFixed(2)}</td><td class="num">${fmt(x.tokens)}</td></tr>`).join('');
+        <td class="num">${fmt(x.tokens)}</td></tr>`).join('');
     const mdl = (s.model_token_top || []).filter(m => m.tokens > 0).map(m => `${esc(m.model)} ${short(m.tokens)}`).join('<br>');
     return `<div class="spike-day">
       <div class="spike-head">
         <span class="spike-date">${s.date}</span>
-        <span class="spike-credit">${s.credit.toFixed(2)} ${t('spikeCredit')}</span>
+        <span class="spike-credit">${short(s.tokens)} tok</span>
         <span class="tag">${s.requests} ${t('spikeReq')}</span>
         <span class="tag">${s.sessions} ${t('spikeSess')}</span>
         <span class="tag">${t('spikeErrRate')} ${s.err_rate}%</span>
@@ -553,12 +550,12 @@ function renderSpikeDays(){
       </div>
       <div class="spike-body">
         <div class="spike-col"><div class="spike-sub">${t('spikeSubSessions')}</div>
-          <table><thead><tr><th>${t('thSess2')||t('thSession')}</th><th>${t('thModel')}</th><th class="num">${t('thCredit2')||t('thCredit')}</th><th class="num">${t('thToken2')||t('thToken')}</th></tr></thead>
-          <tbody>${sessRows || `<tr><td colspan="4">${t('spikeNone')}</td></tr>`}</tbody></table></div>
+          <table><thead><tr><th>${t('thSess2')||t('thSession')}</th><th>${t('thModel')}</th><th class="num">${t('thToken2')||t('thToken')}</th></tr></thead>
+          <tbody>${sessRows || `<tr><td colspan="3">${t('spikeNone')}</td></tr>`}</tbody></table></div>
         <div class="spike-col"><div class="spike-sub">${t('spikeSubModel')}</div>
           <div class="spike-mdl">${mdl || t('spikeNone')}</div></div>
       </div>
-      ${(s.n_zero_credit || s.n_small_credit) ? `<div class="note" style="margin-top:8px;">${t('spikeHidden')(s.n_zero_credit || 0, s.n_small_credit || 0)}</div>` : ''}
+      ${s.n_hidden ? `<div class="note" style="margin-top:8px;">${t('spikeHidden')(s.n_hidden, short(s.hidden_tokens))}</div>` : ''}
     </div>`;
   }).join('');
 }

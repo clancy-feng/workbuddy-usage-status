@@ -16,7 +16,7 @@
 两个口径相互独立：
 
 - Token / 思考用时 / 错误 / 工具调用：来自 `traces/`，按"一次请求"逐条统计。
-- Credit（积分）：来自 `workbuddy.db → session_usage.credit_json`，是 WorkBuddy 自己的计费汇总（已包含内部倍率 / 折扣 / 限免），本 skill 只读取、不做二次换算。
+- Credit（积分）：来自 `workbuddy.db → session_usage.credit_json`，是 WorkBuddy 自己的计费汇总，本 skill 只读取、不做二次换算。
 
 因此"某个会话 token 很多但 credit=0"是正常现象（见第 6 节）。
 
@@ -109,46 +109,48 @@
 
 ### 5.1 选哪几天（"几天？怎么选的"）
 
-1. 先算每日 credit 的中位数 `median_cr`。
-2. 阈值 `thr = max(median_cr × 2, 50)`：credit 高于中位数 2 倍且至少 50 的日子，才算"明显高"。
-3. 满足的日子按 credit 倒序，最多取 6 天。
-4. 兜底：若满足条件的不足 3 天，则直接取 credit 最高的 3 天。
+1. 先算每日 token 总量的中位数 `median_tok`（请求级精确到天）。
+2. 阈值 `thr = max(median_tok × 2, 500 万)`：token 高于中位数 2 倍且至少 500 万的日子，才算"明显高"。
+3. 满足的日子按 token 倒序，最多取 6 天。
+4. 兜底：若满足条件的不足 3 天，则直接取 token 最高的 3 天。
+
+说明：排序依据从 credit 改为 token，因为 token 按请求 `startedAt` 精确到天，而 credit 是归首日估算、无法精确到天。用 token 定位"使用高峰日"才是真实口径。
 
 ### 5.2 每天的拆解字段
 
 对每个入选日，逐日给出：
 
-- 主导会话（按当日 credit）：当天首次出现、且有 credit 的会话，按 credit 降序。
+- 当天会话（按 token）：当天有请求的全部会话（不再限"首次出现日"），按当天 token 降序，模型列显示当天实际请求的全部模型（按 token 降序，逗号分隔；会话内跨模型时与右侧构成对齐）。
 - 模型 token 构成（Top5）：当天所有请求按 `model` 聚合 token，取前 5（token=0 的不显示）。
 - 错误率 = 当天 `errors / 请求数 × 100%`。
 - 均 calls/请求 = 当天总 `calls / 请求数`（高 → 可能反复调用）。
 - 最大单请求 = 当天单次请求的最大 `tokens`。
 
-### 5.3 主导会话的"50 倍比例规则"（隐藏噪音）
+会话表的 token 口径与「模型 token 构成」一致（都是当天全部请求），左右 token 总额相等，可对账。
 
-- 当日峰值会话 credit 记为 `top_cr`，阈值 `ratio_threshold = top_cr / 50`。
-- 只显示 credit ≥ 阈值的会话；其余（零积分 + 不足峰值 1/50 的小额）不进拆解表。
-- 目的：峰值与最小显示值差距 ≤ 50 倍，自动隐去个位数等噪音。
+### 5.3 会话显示上限
+
+- 当天会话按 token 倒序，最多显示 8 个；超过 8 个时，其余在表下标注「另有 N 个会话（合计 X token）未列入」。
 
 ---
 
-## 6. 模型性价比排行（credit / 千 token）
+## 6. 模型性价比排行（credit / 10万 token）
 
 ### 6.1 归因方法
 
 - 用 `sessions.model`（会话级模型名）聚合 credit 与 token，绕开 `credit_json` 无法反查模型的问题。
-- 公式：`credit_per_1k = credit / tokens × 1000`，数值越低越省。
+- 公式：`credit_per_100k = credit / tokens × 100000`，数值越低越省。
 - 过滤：`unknown` 模型、token ≤ 0 的行不进入排行（无法归因或无效）。
 - `'auto'`：会话未锁定具体模型（展示用占位，不计入排行）。
 
 ### 6.2 零 credit 标记
 
 - `zero_credit = True` 当且仅当：该模型 `credit ≤ 0` 且 `tokens ≥ 100 万`。
-- 含义：该模型当前 credit/1k=0，可能处于限免 / 促销期。这类模型，不进入"优化建议"对比，也不该被当成长期成本基准。
+- 含义：该模型当前 credit/10万token=0，可能处于限免 / 促销期。这类模型，不进入"优化建议"对比，也不该被当成长期成本基准。
 
 ### 6.3 优化建议
 
-- 在可比任务量（各模型 token ≥ 1000 万）的通用模型（排除 `auto`/`unknown`/`preview`/`agent`、且 credit>0）中，取 credit/1k 最便宜与最贵的两条。
+- 在可比任务量（各模型 token ≥ 1000 万）的通用模型（排除 `auto`/`unknown`/`preview`/`agent`、且 credit>0）中，取 credit/10万token 最便宜与最贵的两条。
 - 预计节省 = `(最贵 - 最便宜) / 最贵 × 100%`；≥ 5% 才给出建议文案。
 - 前提提示：两个模型处理的工作负载可互相迁移。
 
@@ -156,27 +158,27 @@
 
 ## 7. 参数 / 阈值速查表
 
-| 参数 / 阈值                | 含义 / 当前值                   |
-| ---------------------- | -------------------------- |
-| `median_cr × 2` 与 `50` | 高用量日门槛：取两者较大值              |
-| `top 6` / 兜底 `top 3`   | 入选高用量日上限 / 兜底数量            |
-| `top_cr / 50`          | 主导会话显示门槛（50 倍比例规则）         |
-| `Top10`                | Token 占比扇区、效率图、Top 会话的取数上限 |
-| `token ≥ 100 万`        | 判定零 credit 模型、可比样本的最低任务量   |
-| `credit/1k` 节省 `≥ 5%`  | 触发优化建议的最小差异                |
-| `前 300 次请求`            | 散点图取样上限（控体积）               |
-| `前 200 会话`             | `by_session` 输出上限（控体积）     |
+| 参数 / 阈值                     | 含义 / 当前值                   |
+| --------------------------- | -------------------------- |
+| `median_tok × 2` 与 `500 万`  | 高用量日门槛：取两者较大值              |
+| `top 6` / 兜底 `top 3`        | 入选高用量日上限 / 兜底数量            |
+| `会话 top 8`                  | 每天拆解的会话显示上限，超出在表下标注        |
+| `Top10`                     | Token 占比扇区、效率图、Top 会话的取数上限 |
+| `token ≥ 100 万`             | 判定零 credit 模型、可比样本的最低任务量   |
+| `credit/10万token` 节省 `≥ 5%` | 触发优化建议的最小差异                |
+| `前 300 次请求`                 | 散点图取样上限（控体积）               |
+| `前 200 会话`                  | `by_session` 输出上限（控体积）     |
 
 ---
 
 ## 8. 已知数据统计限制
 
-1. Credit 与 Token 独立统计：credit 走 `workbuddy.db` 计费口径，token 走 `traces` 实际用量；模型限免期 token 照常计、credit=0，两者不成正比属正常。
-2. 用量统计以「有效 trace」为基数——无覆盖率缺口：有效 trace = 有实际 token 消耗的 trace。WorkBuddy 的 agent 框架另会产生一层零 token 的工作流记账记录（不绑定会话、不含用量），这些属于噪声，已排除在统计之外，不影响任何指标。在有效 trace 上，`sessionId` 与 `sessions` 表 100% 对应，因此会话/模型下钻、总量、每日趋势、错误数均为完整真实用量，无需担心「覆盖率稀释」。
-3. 思考用时是代理指标：仅 generation span 时长之和，不含工具调用与等待，不能等同"挂机时长"。
+1. Credit 与 Token 独立统计：credit 走 `workbuddy.db` 计费口径，token 走 `traces` 实际用量；模型限免期 token 照常计、credit=0。
+2. 用量统计以「有效 trace」为基数——无覆盖率缺口：有效 trace = 有实际 token 消耗的 trace，已排除工作流记账噪声数据。在有效 trace 上，`sessionId` 与 `sessions` 表 100% 对应，因此会话/模型下钻、总量、每日趋势、错误数均为完整真实用量。
+3. 思考用时是代理指标，为generation span 时长之和，不含工具调用与等待。
 4. 错误率是 span 级：一次请求多个 span 报错会重复计入，错误率可能 > 单个请求失败率。
 5. 跨日会话 credit **归首日**：因本地无逐日时间戳、只能「归首日」近似（不编造到免费/无消费日）；精确值需用 `--credit-xlsx` 提供官方用量报告实现。
-6. 零积分会话：多为模型限免，或 `session_usage` 未记录该会话 credit（旧会话/格式差异）。
+6. 
 
 ---
 
@@ -186,7 +188,7 @@
 
 - `usage-status.json`：原始聚合数据（调试 / 二次处理用）。
 - `usage-status.js`：`window.USAGE_STATUS = {...}`，供 HTML 直接 `<script>` 引入，避开 `file://` 的 fetch 跨域。
-- `workbuddy-usage-status-dashboard.html`：自包含离线看板（数据 + Chart.js 全部内联，双击即可离线打开，零外网依赖）。
+- `workbuddy-usage-status-dashboard-<时间戳>.html`：自包含离线看板（数据 + Chart.js 全部内联，双击即可离线打开，零外网依赖）；文件名带生成时间戳，每次生成独立文件，不覆盖旧报告，便于保留多份对比。
 
 运行：`python usage_extractor.py [--out 目录] [--home ~/.workbuddy]`
 

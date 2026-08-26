@@ -26,7 +26,7 @@
 
 把 WorkBuddy 自己的本地使用数据，变成一份离线可查的 Dashboard。
 
-可以看到：token 消耗（主角指标，本地精确）、思考用时、思考效率、模型分布、错误数、credit 消耗（本地估算，可选导入用量导出精确化）。
+可以看到：token 消耗、思考用时、思考效率、模型分布、错误数、credit 消耗（本地估算，可选导入用量导出精确化）。
 
 ## ✨ 核心功能特性
 
@@ -46,11 +46,11 @@
 
 ---
 
-## 1. 你能看到什么
+## 1. 能看到什么
 
 - WorkBuddy 一共花了多少 token / credit？思考了多久？
 
-- 哪个会话、哪个模型最费？效率最低的是谁？
+- 哪个会话、哪个模型最费？模型效率怎么样？
 
 - 哪天用量飙升？错误集中在哪些会话/模型？
 
@@ -84,7 +84,7 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 
 ## 3. 怎么用
 
-装好 skill（见第 2 节）并重启 WorkBuddy 后，有两种用法。
+装好 skill并重启 WorkBuddy 后，有两种用法。
 
 ### 入口 A：对话触发
 
@@ -95,8 +95,6 @@ git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/ski
 - "查看一下最近 workbuddy 的使用状态"
 
 - "我想看看 workbuddy 的工作信息看板，包括 token 消耗和模型分布"
-
-> 边界：本技能**仅**响应明确指向 WorkBuddy 本机用量的请求。以下情况**不会**触发——泛指"导出我的数据 / 做个统计图表"（无 WorkBuddy 上下文）、查询其他产品（Cursor / VS Code / GitHub 等）的用量、或为任意数据生成通用看板。
 
 ### 入口 B：命令行直接跑
 
@@ -112,7 +110,7 @@ python3 scripts/usage_extractor.py --out ./report
 # 指定数据根（一般不用，默认 ~/.workbuddy）
 python3 scripts/usage_extractor.py --home /other/.workbuddy
 
-# 可选：用用量导出 xlsx 精确覆盖对应日期窗口的 credit（低调可选参数，不进默认流程）
+# 可选：用用量导出 xlsx 精确覆盖对应日期窗口的 credit
 # xlsx 来自 workbuddy.cn 用量页 → 选日期范围 → 导出；最多含 1 个月
 python3 scripts/usage_extractor.py --credit-xlsx ~/Downloads/request-usage-2026-08-10.xlsx
 ```
@@ -123,13 +121,13 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 
 脚本在「输出目录」（即你运行命令时所在目录，或 `--out` 指定的目录）生成 3 个文件：
 
-| 文件                                      | 说明                                  |
-| --------------------------------------- | ----------------------------------- |
-| `workbuddy-usage-status-dashboard.html` | 自包含单文件，数据 + Chart.js 均已内联，双击即看，无需联网 |
-| `usage-status.json`                     | 聚合后的原始数据，可二次处理                      |
-| `usage-status.js`                       | `window.USAGE_STATUS = {...}`，备用    |
+| 文件                                            | 说明                                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| `workbuddy-usage-status-dashboard-<时间戳>.html` | 自包含单文件，数据 + Chart.js 均已内联，双击即看，无需联网；文件名带生成时间戳，每次生成独立文件，不覆盖旧报告，可保留多份对比 |
+| `usage-status.json`                           | 聚合后的原始数据，可二次处理                                                        |
+| `usage-status.js`                             | `window.USAGE_STATUS = {...}`，备用                                      |
 
-打开 `workbuddy-usage-status-dashboard.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 会话表（按 token 消耗取前 10）+ 每日错误。四张时序图的横轴会按所选日期范围的跨度自动在「日 / 周 / 月」之间切换（≤120 天按日，120–730 天按周，>730 天按月），数据跨度越大越能避免横坐标过密、标签重叠。
+打开最新生成的 `workbuddy-usage-status-dashboard-*.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 Token消耗会话表 + 每日错误。四张时序图的横轴会按所选日期范围的跨度自动在「日 / 周 / 月」之间切换（≤120 天按日，120–730 天按周，>730 天按月），数据跨度越大越能避免横坐标过密、标签重叠。日期选择器实时生效：修改起止日期后看板立即刷新，无需点击任何按钮。
 
 ---
 
@@ -141,11 +139,11 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 python3 scripts/usage_extractor.py --out ./report
 ```
 
-（想每天自动刷新，可用 WorkBuddy 的"自动化/定时任务"每天跑这条命令。）
+如想每天自动刷新，可用 WorkBuddy 的"自动化/定时任务"每天跑这条命令。
 
 ---
 
-## 5. 指标来源及算法（详情见 DATA-GUIDE.md）
+## 5. 指标来源及算法（详见 DATA-GUIDE.md）
 
 | 指标        | 算法                                                                       | 数据来源                        |
 | --------- | ------------------------------------------------------------------------ | --------------------------- |
@@ -163,7 +161,7 @@ python3 scripts/usage_extractor.py --out ./report
 
 2. 快照式：手动/定时跑。要实时监督需包成常驻服务（直接查 DB+traces）。
 
-3. 首跑耗时：全量解析 traces（可能上千文件、上 GB）约 10–30 秒，一次性。
+3. 首跑耗时：全量解析 traces约 10–30 秒，一次性。
 
 ---
 
@@ -173,7 +171,6 @@ python3 scripts/usage_extractor.py --out ./report
 | ----------------- | ------------------------------------------------------------------------------------------------- |
 | 打开 HTML 显示"数据未加载" | 没先跑脚本；或脚本报错中断。重跑 `usage_extractor.py` 看 stderr                                                    |
 | 图表空白但数字在          | 极少见：若报错"缺少 chart.umd.min.js"，确认该文件与 usage_extractor.py 同在 scripts/ 下后重跑；正常情况 Chart.js 已随包内联，零外网依赖 |
-| 数据库被占用            | 抽取器以只读模式（`mode=ro`）打开，正常不影响正在运行的 WorkBuddy                                                        |
 | 数据明显偏少            | 这台机器 traces 少/刚装；或 `--home` 指错了目录                                                                 |
 
 ---
@@ -218,7 +215,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.2.1（2026-08-12）
+当前最新版本：v1.2.5（2026-08-26）
 
 ---
 
@@ -226,7 +223,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 本技能由 WorkBuddy 重度用户开发，专注 AI 工具用量可视化方向。
 
-- 小红书：@AI管家老冯 - 分享 WorkBuddy 使用技巧与技能更新动态
+- 小红书：@AI监工老冯 - 分享 WorkBuddy 使用技巧与技能更新动态
 
 - GitHub：clancy-feng
 
