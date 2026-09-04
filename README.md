@@ -34,6 +34,14 @@
 
 可以看到：token 消耗、思考用时、思考效率、模型分布、错误数、credit 消耗。
 
+## 📸 看板预览
+
+> 以下为 Dashboard 实际渲染效果（图片为仓库相对路径，在 Gitee / GitHub 页面与本地均可直接显示）：
+
+![看板预览 1](dashboard-preview-1.png)
+
+![看板预览 2](dashboard-preview-2.png)
+
 ## ✨ 核心功能特性
 
 - Token/Credit 全链路可视化：按模型、按日期、按会话统计，一眼定位"烧钱大户"
