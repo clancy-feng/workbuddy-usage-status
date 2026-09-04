@@ -10,6 +10,8 @@ WorkBuddy 本地 usage-status 抽取器
   - usage-status.js     window.USAGE_STATUS = {...}  (供 HTML 直接 <script> 引入, 避开 file:// 的 fetch 跨域限制)
 """
 import sqlite3, json, os, glob, datetime, sys, argparse
+import urllib.request, ssl
+from collections import Counter, defaultdict
 
 HOME = os.path.expanduser("~/.workbuddy")
 DB = os.path.join(HOME, "workbuddy.db")
@@ -22,6 +24,17 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 skipped_trace_files = []   # (路径, 错误) 损坏或无法解析的 trace 文件
 bad_credit_sessions = 0    # credit_json 解析失败的会话数
 
+# 错误明细聚合：把原本被丢弃的 span.error 字符串内容重新捕获并分类，
+# 用于把"裸错误计数"升级为可下钻的错误分析（按消息/类型/工具/模型/会话）。
+err_msg_counter = Counter()       # 错误信息字符串 -> 次数
+err_type_counter = Counter()       # 出错 span 的 type -> 次数
+err_tool_counter = Counter()       # 出错 span 的 toolName -> 次数
+err_by_model = {}                 # model -> Counter(错误信息)
+day_model_tokens = {}             # (day, model) -> tokens，供官方 xlsx 窗口内精确 credit/10万token
+err_by_session = {}               # session_id -> Counter(错误信息)
+err_by_day = {}                   # date -> Counter(错误信息)
+error_samples = []                # 近期错误样本（≤50 条，供下钻）
+
 # 输出目录: 默认当前工作目录, 可用 --out 覆盖
 parser = argparse.ArgumentParser(description="WorkBuddy 本地 usage-status 抽取器")
 parser.add_argument("--out", default=os.getcwd(),
@@ -32,6 +45,10 @@ parser.add_argument("--credit-xlsx", default=None,
                     help="可选：用量明细 xlsx 路径（来自 workbuddy.cn 用量导出）。提供后，对应日期窗口内的每日 "
                          "credit 以服务端精确值覆盖本地估算；仅覆盖有数据的日期，其余日期仍为本地估算。"
                          "低调可选参数，不进默认流程，按需使用。")
+parser.add_argument("--billing-token-file", default=None,
+                    help="可选：用户手动从浏览器导出的用量 API 鉴权头文件（如 DevTools 复制的 `Cookie: ...` 整行，"
+                         "或 `Authorization: Bearer ...`）。提供后，skill 以该 token 调用官方用量 API 拉取精确 credit"
+                         "（opt-in，绝不自动读取宿主 App 凭据）。与 --credit-xlsx 同时提供时，API 优先。")
 args = parser.parse_args()
 HOME = args.home
 DB = os.path.join(HOME, "workbuddy.db")
@@ -63,10 +80,10 @@ def day_key(ts_ms):
     return datetime.datetime.fromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d")
 
 
-def read_credit_xlsx(path):
-    """stdlib-only 最小 xlsx 读取器（不依赖 openpyxl），返回 {day: credit_sum}。
-    期望列（表头文字，中/英均可）：RequestID / 积分消耗 / 时间（或 requestId / credit / time）。
-    时间按 'YYYY-MM-DD HH:MM:SS' 解析为本地日期。返回空 dict 表示读取失败或无重叠必要列。
+def _read_xlsx_rows(path):
+    """stdlib-only 最小 xlsx 读取器（不依赖 openpyxl）。
+    返回 (rows, header)；rows 为 [{列字母: 值}, ...]，header 即 rows[0]。
+    失败时返回 (None, None)。
     """
     import zipfile
     import xml.etree.ElementTree as ET
@@ -81,7 +98,7 @@ def read_credit_xlsx(path):
         z = zipfile.ZipFile(path)
     except Exception as e:
         print("  xlsx 打开失败:", e, flush=True)
-        return {}
+        return None, None
     names = set(z.namelist())
 
     # 共享字符串表
@@ -100,13 +117,13 @@ def read_credit_xlsx(path):
         cands = [n for n in names if n.startswith("xl/worksheets/sheet")]
         if not cands:
             print("  xlsx 未找到 worksheet", flush=True)
-            return {}
+            return None, None
         sheet_path = sorted(cands)[0]
     try:
         root = ET.fromstring(z.read(sheet_path))
     except Exception as e:
         print("  xlsx 解析失败:", e, flush=True)
-        return {}
+        return None, None
 
     rows = []
     for row in root.iter(ns + "row"):
@@ -131,19 +148,30 @@ def read_credit_xlsx(path):
                 cells[col] = val
         rows.append(cells)
     if not rows:
+        return None, None
+    return rows, rows[0]
+
+
+def find_xlsx_col(header, names_needed):
+    """在表头里按关键字找列字母（中英文均可）。"""
+    for col, val in header.items():
+        if val and any(nm.lower() in str(val).lower() for nm in names_needed):
+            return col
+    return None
+
+
+def read_credit_xlsx(path):
+    """读取用量导出 xlsx，返回 {day: credit_sum}。
+    期望列（表头文字，中/英均可）：RequestID / 积分消耗 / 时间（或 requestId / credit / time）。
+    时间按 'YYYY-MM-DD HH:MM:SS' 解析为本地日期。返回空 dict 表示读取失败或无重叠必要列。
+    """
+    rows, header = _read_xlsx_rows(path)
+    if rows is None:
         return {}
 
-    header = rows[0]
-
-    def find_col(names_needed):
-        for col, val in header.items():
-            if val and any(nm.lower() in str(val).lower() for nm in names_needed):
-                return col
-        return None
-
-    rid_c = find_col(["requestid", "RequestID"])
-    cr_c = find_col(["积分消耗", "credit"])
-    tm_c = find_col(["时间", "time"])
+    rid_c = find_xlsx_col(header, ["requestid", "RequestID"])
+    cr_c = find_xlsx_col(header, ["积分消耗", "credit"])
+    tm_c = find_xlsx_col(header, ["时间", "time"])
     if not (cr_c and tm_c):
         print("  xlsx 缺少必要列（积分消耗/credit、时间/time）", flush=True)
         return {}
@@ -166,6 +194,114 @@ def read_credit_xlsx(path):
             continue
         result[day] = result.get(day, 0.0) + credit
     return result
+
+
+def read_credit_xlsx_by_model(path):
+    """读取官方用量导出 xlsx，按【模型】汇总服务端精确 credit。
+
+    官方导出列（页面表头顺序）：时间 / 积分消耗 / 模型 / 客户端 / Request
+    （"包含输入提示词"为可选项，默认不含；本函数不读取提示词内容）。
+
+    返回 (by_model, by_model_cnt)；
+      by_model     = {model: credit}   服务端精确值
+      by_model_cnt = {model: 请求数}
+    无「模型」列或读取失败时返回 ({}, {})。
+    """
+    rows, header = _read_xlsx_rows(path)
+    if rows is None:
+        return {}, {}
+    cr_c = find_xlsx_col(header, ["积分消耗", "credit"])
+    md_c = find_xlsx_col(header, ["模型", "model"])
+    if not cr_c:
+        print("  xlsx 缺少 credit 列（积分消耗/credit），无法按模型汇总。", flush=True)
+        return {}, {}
+    if not md_c:
+        print("  xlsx 无「模型」列，无法按模型汇总官方 credit（每日 credit 不受影响）。", flush=True)
+        return {}, {}
+
+    by_model = {}
+    by_model_cnt = {}
+    for cells in rows[1:]:
+        cv = cells.get(cr_c)
+        if cv in (None, ""):
+            continue
+        try:
+            credit = float(str(cv).replace(",", ""))
+        except Exception:
+            continue
+        mv = (cells.get(md_c) or "").strip() or "(未知模型)"
+        by_model[mv] = by_model.get(mv, 0.0) + credit
+        by_model_cnt[mv] = by_model_cnt.get(mv, 0) + 1
+    return by_model, by_model_cnt
+
+
+# ---------- 0.5 可选：用量 API（用户手动导出 token，opt-in） ----------
+# 与 --credit-xlsx 不同，这里直接从官方计费 API 拉取逐请求精确 credit，无需先导出 xlsx。
+# 安全约束：token 必须由用户**显式提供**（从自己浏览器 DevTools 复制后存入本地文件）；
+# skill 绝不自动读取宿主 App 的凭据存储（跨应用凭据获取 = 审计高危）。
+BILLING_API_URL = "https://www.workbuddy.cn/billing/meter/get-user-request-usage"
+
+def aggregate_billing_rows(rows):
+    """把官方 API 返回 data.data[] 聚合为 (day_credit, by_model, by_model_cnt, date_min, date_max)。
+    data.data[] 每项：{requestId, credit, model, client, requestTime, ...}
+    requestTime 形如 'YYYY-MM-DD HH:MM:SS'，按前 10 位归日。
+    """
+    day_map = {}
+    by_model = {}
+    by_model_cnt = {}
+    dates = []
+    for it in rows:
+        rt = it.get("requestTime") or ""
+        day = rt[:10]
+        if len(day) != 10:
+            continue
+        try:
+            credit = float(it.get("credit") or 0)
+        except Exception:
+            credit = 0.0
+        day_map[day] = day_map.get(day, 0.0) + credit
+        m = (it.get("model") or "").strip() or "(未知模型)"
+        by_model[m] = by_model.get(m, 0.0) + credit
+        by_model_cnt[m] = by_model_cnt.get(m, 0) + 1
+        dates.append(day)
+    dmin = min(dates) if dates else None
+    dmax = max(dates) if dates else None
+    return day_map, by_model, by_model_cnt, dmin, dmax
+
+def fetch_billing_usage(token_file, start, end):
+    """调用官方用量 API（opt-in）。返回 aggregate_billing_rows 的元组；失败抛异常由调用方回退。
+    token_file 内容：用户从浏览器 DevTools 复制的鉴权头（如 `Cookie: xxx` 整行，
+    或 `Authorization: Bearer xxx`）。首行 `Key: Value` 解析为请求头；无冒号则当作 Cookie 值。
+    """
+    raw = open(token_file, encoding="utf-8").read().strip()
+    if not raw:
+        raise ValueError("token 文件为空")
+    # 解析鉴权头：取首个非空行；若含冒号则拆为 Key/Value，否则整体当作 Cookie 值
+    header_key, header_val = "Cookie", raw
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if ":" in line:
+            k, v = line.split(":", 1)
+            header_key, header_val = k.strip(), v.strip()
+        break
+    body = json.dumps({
+        "startTime": f"{start} 00:00:00",
+        "endTime": f"{end} 23:59:59",
+        "pageNum": 1,
+        "pageSize": 3000,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        BILLING_API_URL, data=body, method="POST",
+        headers={"Content-Type": "application/json", header_key: header_val},
+    )
+    ctx = ssl.create_default_context()
+    with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    if payload.get("code") != 0:
+        raise RuntimeError("用量 API 返回错误: %r" % (payload.get("msg"),))
+    return aggregate_billing_rows(payload.get("data", {}).get("data", []))
 
 
 # ---------- 1. 读取 DB: session 元信息 + 用量 ----------
@@ -250,10 +386,29 @@ for i, fp in enumerate(files):
     tool_ms = 0
     tool_count = 0
     err_count = 0
+    dk = day_key(started)   # 本请求归属日期，供错误按天聚合
+    # 按「日期 × 模型」累计 token：官方 xlsx 只给 credit 不给 token，
+    # 需用它算出导出窗口内各模型的 token，才能得到精确的 credit/10万token。
+    day_model_tokens[(dk, model_name)] = day_model_tokens.get((dk, model_name), 0) + total_tokens
     for s in spans:
         st = s.get("status")
-        if st == "error" or s.get("error"):
+        em = s.get("error")
+        if st == "error" or em:
             err_count += 1
+            # 把被丢弃的 error 内容还原为可分类的统计信息
+            emsg = em if isinstance(em, str) else (json.dumps(em, ensure_ascii=False) if em else (st or "error"))
+            if len(emsg) > 300:
+                emsg = emsg[:300]
+            etype = s.get("type") or ""
+            etool = s.get("toolName") or ""
+            err_msg_counter[emsg] += 1
+            err_type_counter[etype or "unknown"] += 1
+            if etool:
+                err_tool_counter[etool] += 1
+            err_by_model.setdefault(model_name, Counter())[emsg] += 1
+            if session_id:
+                err_by_session.setdefault(session_id, Counter())[emsg] += 1
+            err_by_day.setdefault(dk, Counter())[emsg] += 1
         t = s.get("type")
         d = s.get("duration") or 0
         if t == "generation":
@@ -284,6 +439,24 @@ for i, fp in enumerate(files):
         "errors": err_count,
     }
     requests.append(rec)
+
+    # 错误样本（每请求取首条错误，封顶 50 条供下钻）
+    if err_count and len(error_samples) < 50:
+        err_examples = [s for s in spans if s.get("status") == "error" or s.get("error")]
+        if err_examples:
+            e0 = err_examples[0]
+            e0msg = e0.get("error")
+            e0msg = e0msg if isinstance(e0msg, str) else (json.dumps(e0msg, ensure_ascii=False) if e0msg else (e0.get("status") or "error"))
+            if len(e0msg) > 300:
+                e0msg = e0msg[:300]
+            error_samples.append({
+                "date": dk,
+                "session_id": (session_id or "")[:12],
+                "model": model_name,
+                "tool": e0.get("toolName") or "",
+                "type": e0.get("type") or "",
+                "msg": e0msg,
+            })
 
     # 日聚合
     dk = rec["date"]
@@ -389,6 +562,7 @@ sess_list.sort(key=lambda x: x["tokens"], reverse=True)
 # （不锁死筛选器，用户仍可拉回看全量 token 历史）。
 xlsx_date_min = None
 xlsx_date_max = None
+model_cost_official = []   # 官方 xlsx 逐模型精确 credit（服务端口径）；为空表示未提供导出
 if args.credit_xlsx:
     print("[3.5] 读取用量导出 xlsx (--credit-xlsx) ...", flush=True)
     xmap = read_credit_xlsx(args.credit_xlsx)
@@ -402,15 +576,89 @@ if args.credit_xlsx:
             credit_source = "xlsx_precise"
             credit_note = (f"credit 已用用量导出 xlsx 精确覆盖 {covered} 天（窗口内为服务端精确值）；"
                            f"未覆盖日期仍为本地估算。xlsx 最多含 1 个月，历史长期趋势仍看 token。")
-            xlsx_dates = sorted(xmap.keys())
-            xlsx_date_min = xlsx_dates[0]
-            xlsx_date_max = xlsx_dates[-1]
-            print(f"  xlsx 覆盖 {covered} 天，credit 已更新为精确值；日期窗口 {xlsx_date_min}~{xlsx_date_max}。", flush=True)
         else:
             credit_note = "提供的 xlsx 未包含与本地数据重叠的日期，credit 仍为本地估算。"
-            print("  xlsx 与本地数据无日期重叠，credit 维持本地估算。", flush=True)
+        xlsx_dates = sorted(xmap.keys())
+        xlsx_date_min = xlsx_dates[0]
+        xlsx_date_max = xlsx_dates[-1]
+
+        # ---- 按模型汇总官方精确 credit（服务端逐请求口径）----
+        # 本地「模型性价比」是会话级归因：整会话 credit 全归给 sessions.model。
+        # 同一会话混用免费/付费模型时，付费 credit 会被错记到免费模型上（如 hy3 虚高）。
+        # 官方导出是逐请求的真实 credit，用它修正后免费模型才会如实显示为 0 并被标为限免。
+        xmodel, xmodel_cnt = read_credit_xlsx_by_model(args.credit_xlsx)
+        if xmodel:
+            # xlsx 不含 token，取本地 traces 同窗口内的 token 来配平 credit/10万token
+            win_tokens = {}
+            for (d, m), tk in day_model_tokens.items():
+                if xlsx_date_min <= d <= xlsx_date_max:
+                    win_tokens[m] = win_tokens.get(m, 0) + tk
+            for m, cr in sorted(xmodel.items(), key=lambda kv: kv[1]):
+                tk = win_tokens.get(m, 0)
+                model_cost_official.append({
+                    "model": m,
+                    "requests": xmodel_cnt.get(m, 0),
+                    "tokens": tk,
+                    "credit": round(cr, 2),
+                    "credit_per_100k": (round(cr / tk * 100000.0, 2) if tk else None),
+                    # 官方精确口径下的「限免」判定：credit 为 0 且用量不小
+                    "zero_credit": (cr <= 0.0 and tk >= 1_000_000),
+                })
+            print(f"  xlsx 按模型汇总 {len(xmodel)} 个模型（服务端精确 credit）。", flush=True)
+        if covered:
+            print(f"  xlsx 覆盖 {covered} 天，credit 已更新为精确值；日期窗口 {xlsx_date_min}~{xlsx_date_max}。", flush=True)
+        else:
+            print("  xlsx 与本地数据无日期重叠，每日 credit 维持本地估算。", flush=True)
     else:
         print("  xlsx 读取失败或未识别到必要列，credit 维持本地估算。", flush=True)
+
+# ---- 3.6 可选：用量 API（用户手动导出 token，opt-in，优先于 xlsx）----
+# 与 3.5 同口径：覆盖每日 credit + 按模型精确 credit。绝不自动读取宿主 App 凭据。
+billing_date_min = None
+billing_date_max = None
+if args.billing_token_file:
+    print("[3.6] 用量 API（--billing-token-file，用户手动提供 token）...", flush=True)
+    try:
+        api_start = (summary.get("date_min")
+                     or (datetime.date.today() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
+        api_end = summary.get("date_max") or datetime.date.today().strftime("%Y-%m-%d")
+        day_map, by_model, by_model_cnt, bmin, bmax = fetch_billing_usage(
+            args.billing_token_file, api_start, api_end)
+        if day_map:
+            covered = 0
+            for b in day_list:
+                if b["date"] in day_map:
+                    b["credit"] = round(day_map[b["date"]], 2)
+                    covered += 1
+            if covered:
+                credit_source = "api_precise"
+                credit_note = (f"credit 已用官方用量 API 精确覆盖 {covered} 天"
+                               f"（窗口内为服务端精确值，由用户手动提供的 token 拉取）；"
+                               f"未覆盖日期仍为本地估算。")
+            billing_date_min, billing_date_max = bmin, bmax
+            # 按模型汇总官方精确 credit（逐请求口径，修正本地归因虚高）
+            if by_model:
+                win_tokens = {}
+                for (d, m), tk in day_model_tokens.items():
+                    if (billing_date_min or "0000") <= d <= (billing_date_max or "9999"):
+                        win_tokens[m] = win_tokens.get(m, 0) + tk
+                model_cost_official = []
+                for m, cr in sorted(by_model.items(), key=lambda kv: kv[1]):
+                    tk = win_tokens.get(m, 0)
+                    model_cost_official.append({
+                        "model": m,
+                        "requests": by_model_cnt.get(m, 0),
+                        "tokens": tk,
+                        "credit": round(cr, 2),
+                        "credit_per_100k": (round(cr / tk * 100000.0, 2) if tk else None),
+                        "zero_credit": (cr <= 0.0 and tk >= 1_000_000),
+                    })
+                print(f"  API 按模型汇总 {len(by_model)} 个模型（服务端精确 credit）。", flush=True)
+            print(f"  API 覆盖 {covered} 天，credit 已更新为精确值；窗口 {billing_date_min}~{billing_date_max}。", flush=True)
+        else:
+            print("  API 返回空数据，credit 维持本地估算。", flush=True)
+    except Exception as e:
+        print("  用量 API 拉取失败，credit 维持本地估算：", e, flush=True)
 
 # ---------- 2.6 模型性价比 (会话级 model 聚合, 关联 sessions.model) ----------
 print("[2.6] 模型性价比 ...", flush=True)
@@ -534,6 +782,7 @@ for d in top_days:
         "top_sessions": shown_sessions,
         "n_hidden": n_hidden,
         "hidden_tokens": hidden_tokens,
+        "top_error_msg": (err_by_day.get(d).most_common(1)[0][0] if err_by_day.get(d) else ""),
     })
 
 total_tokens = sum(r["tokens"] for r in requests)
@@ -545,8 +794,34 @@ total_credit = round(sum(b["credit"] for b in day_list), 2)
 total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
+# ---------- 2.8 错误明细聚合 ----------
+# 把全局错误计数器汇总为可下钻的结构：高频消息、按类型、按工具、按模型、按会话、样本。
+# 数据量受 Counter 与 ≤50 样本约束，体积可控。
+error_top_messages = [{"msg": m, "count": c} for m, c in err_msg_counter.most_common(10)]
+error_by_type = [{"type": t, "count": c} for t, c in err_type_counter.most_common()]
+error_by_tool = [{"tool": t, "count": c} for t, c in err_tool_counter.most_common(10)]
+error_by_model_list = sorted(
+    [{"model": m, "count": sum(c.values()), "top_msg": (c.most_common(1)[0][0] if c else "")}
+     for m, c in err_by_model.items()],
+    key=lambda x: -x["count"])[:10]
+error_by_session_list = sorted(
+    [{"session_id": sid[:12],
+      "title": (sess_meta.get(sid, {}).get("title", "") or "")[:40],
+      "count": sum(c.values()), "top_msg": (c.most_common(1)[0][0] if c else "")}
+     for sid, c in err_by_session.items()],
+    key=lambda x: -x["count"])[:10]
+error_detail = {
+    "total": total_errors,
+    "top_messages": error_top_messages,
+    "by_type": error_by_type,
+    "by_tool": error_by_tool,
+    "by_model": error_by_model_list,
+    "by_session": error_by_session_list,
+    "samples": error_samples,
+}
+
 summary = {
-    "version": "1.2.6",
+    "version": "1.3.0",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -561,11 +836,15 @@ summary = {
     "avg_thinking_sec_per_request": round(total_thinking / len(requests), 1) if requests else 0,
     "total_credit": total_credit,
     "total_errors": total_errors,
+    "top_error_msg": (error_top_messages[0]["msg"] if error_top_messages else ""),
+    "top_error_pct": (round(error_top_messages[0]["count"] / total_errors * 100, 1) if total_errors else 0.0),
     "avg_efficiency_tok_per_sec": round(total_output / total_thinking, 1) if total_thinking else 0,
     "date_min": min(dates) if dates else None,
     "date_max": max(dates) if dates else None,
     "credit_xlsx_date_min": xlsx_date_min,
     "credit_xlsx_date_max": xlsx_date_max,
+    "billing_date_min": billing_date_min,
+    "billing_date_max": billing_date_max,
     "model_count": len(model_list),
 }
 
@@ -589,8 +868,10 @@ out = {
     "requests_sample": requests_trim,
     "requests_slim": requests_slim,
     "by_model_cost": model_cost_list,
+    "model_cost_official": model_cost_official,
     "model_tips": model_tips,
     "spike_days": spike_days,
+    "error_detail": error_detail,
 }
 
 # 数据完整性提示：把被静默跳过的记录暴露出来，避免用户误以为报告完整

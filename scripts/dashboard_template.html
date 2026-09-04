@@ -7,18 +7,49 @@
 <!--CHART_JS-->
 <style>
   :root{
+    /* 深色基准（默认） */
     --bg:#15171c; --panel:#1e2129; --panel2:#262a34; --border:#333845;
-    --text:#e6e9ef; --muted:#9aa3b2; --accent:#4f9dff; --red:#ff5c5c;
+    --text:#e6e9ef; --muted:#9aa3b2; --red:#ff5c5c;
     --green:#3ecf8e; --yellow:#ffcc66; --purple:#b58cff;
+    /* 主题强调色（皮肤可覆盖）；accent-rgb 供图表 rgba 背景使用 */
+    --accent:#4f9dff; --accent-rgb:79,157,255;
+    /* 图表语义色（随主题切换，保证浅色模式可见） */
+    --c-grid:#2a2f3a; --c-axis:#9aa3b2;
   }
+  /* 浅色主题 */
+  [data-theme="light"]{
+    --bg:#f5f6f8; --panel:#ffffff; --panel2:#eef0f3; --border:#d8dce3;
+    --text:#1a1d23; --muted:#5b6472; --red:#e0392f;
+    --green:#1f9d63; --yellow:#c79100; --purple:#7c4dff;
+    --c-grid:#e2e6ec; --c-axis:#5b6472;
+  }
+  /* 自动模式：跟随系统；当系统为浅色且用户未强制深色时套用浅色变量 */
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f5f6f8; --panel:#ffffff; --panel2:#eef0f3; --border:#d8dce3;
+      --text:#1a1d23; --muted:#5b6472; --red:#e0392f;
+      --green:#1f9d63; --yellow:#c79100; --purple:#7c4dff;
+      --c-grid:#e2e6ec; --c-axis:#5b6472;
+    }
+  }
+  /* 皮肤预设：仅覆盖强调色（按钮、Token 折线、散点），不改变数据语义色 */
+  [data-skin="azure"]{ --accent:#4f9dff; --accent-rgb:79,157,255; }
+  [data-skin="emerald"]{ --accent:#22b573; --accent-rgb:34,181,115; }
+  [data-skin="sunset"]{ --accent:#ff8a3d; --accent-rgb:255,138,61; }
+  [data-skin="violet"]{ --accent:#a06bff; --accent-rgb:160,107,255; }
+  [data-skin="rose"]{ --accent:#ff5e9c; --accent-rgb:255,94,156; }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
   header{padding:20px 28px;border-bottom:1px solid var(--border);background:var(--panel);position:relative;}
   header h1{margin:0;font-size:20px;font-weight:600;}
   header .sub{color:var(--muted);font-size:12px;margin-top:6px;}
-  header .lang-toggle{position:absolute;top:20px;right:28px;background:var(--panel2);border:1px solid var(--border);
-    color:var(--text);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;}
+  .head-controls{position:absolute;top:18px;right:28px;display:flex;gap:8px;align-items:center;}
+  .ctrl-btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;
+    padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+  .ctrl-btn:hover{border-color:var(--accent);}
+  header .lang-toggle{background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;}
   header .lang-toggle:hover{border-color:var(--accent);}
   .wrap{padding:22px 28px;max-width:1400px;margin:0 auto;}
   .filter-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
@@ -26,6 +57,11 @@
   .filter-bar input[type=date]{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;}
   .filter-bar button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
   .filter-bar button:hover{opacity:.9;}
+  .filter-bar .xlsx-upload{display:inline-flex;align-items:center;gap:8px;align-self:center;}
+  .xlsx-btn{cursor:pointer;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);user-select:none;}
+  .xlsx-btn:hover{border-color:var(--accent);}
+  .xlsx-status{font-size:11px;color:var(--muted);}
+  .xlsx-status.err{color:var(--red);}
   .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px;}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
   .kpi .label{color:var(--muted);font-size:12px;}
@@ -47,6 +83,7 @@
   .est-badge.local{background:rgba(255,204,102,.15);color:var(--yellow);border:1px solid rgba(255,204,102,.4);}
   .est-badge.precise{background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.4);}
   .kpi .val .est{color:var(--yellow);font-weight:700;margin-left:2px;}
+  .kpi-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;word-break:break-word;}
   .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);font-size:11px;}
   .err{color:var(--red);}
   .zero-credit{color:var(--yellow);font-size:11px;margin-left:6px;}
@@ -65,14 +102,35 @@
 <body>
 <header>
   <h1 data-i18n="title">Workbuddy使用数据看板</h1>
-  <div class="sub" id="sub">加载中…</div>
-  <button class="lang-toggle" id="langToggle">EN</button>
+  <div class="sub" id="sub">正在加载…（若长时间停留在此，请用浏览器打开本文件并确认已启用 JavaScript）</div>
+  <noscript><div class="sub err">本看板需要 JavaScript 才能渲染。请用浏览器直接打开此文件（双击 / file:// 协议）并允许运行脚本；应用内预览面板可能因沙箱限制不执行脚本。</div></noscript>
+  <div class="head-controls">
+    <select class="ctrl-btn" id="themeSelect" title="切换主题：自动=跟随系统明暗">
+      <option value="auto">自动（跟随系统）</option>
+      <option value="light">浅色</option>
+      <option value="dark">深色</option>
+    </select>
+    <select class="ctrl-btn" id="skinSelect" title="切换皮肤">
+      <option value="azure">经典蓝</option>
+      <option value="emerald">墨绿</option>
+      <option value="sunset">暖橙</option>
+      <option value="violet">梦幻紫</option>
+      <option value="rose">蔷薇粉</option>
+    </select>
+    <button class="lang-toggle" id="langToggle">EN</button>
+  </div>
 </header>
 <div id="dataWarn" style="display:none;margin:12px 16px;padding:10px 14px;border:1px solid #e0a800;border-radius:8px;background:#fff8e1;color:#7a5b00;font-size:13px;line-height:1.6"></div>
 <div class="wrap" id="app" style="display:none">
   <div class="filter-bar">
     <label data-i18n="start">起始日期 <input type="date" id="startDate"></label>
     <label data-i18n="end">结束日期 <input type="date" id="endDate"></label>
+    <span id="dateErr" style="display:none;color:#e5484d;font-size:12px;align-self:center;"></span>
+    <span class="xlsx-upload">
+      <label class="xlsx-btn" for="xlsxFile" data-i18n="xlsxUploadLabel">上传用量导出 xlsx</label>
+      <input type="file" id="xlsxFile" accept=".xlsx" hidden>
+      <span class="xlsx-status" id="xlsxStatus"></span>
+    </span>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -92,17 +150,24 @@
     </div>
     <div class="card full" id="spikeCard">
       <h3 data-i18n="cardSpike">用量高峰探查</h3>
-      <div class="hint" data-i18n="hintSpike">按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。会话表与模型构成均按当天请求统计，模型为当天实际请求模型。</div>
+      <div class="hint" data-i18n="hintSpike">按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。</div>
       <div id="spikeDays"></div>
     </div>
-    <div class="card full"><h3 data-i18n="cardCost">模型性价比排行（credit / 10万 token）</h3><div class="hint" data-i18n="hintCost">按模型聚合 credit 与 token；数值越低性价比越高。credit 与 token 均按会话主模型归因，会话内跨模型使用时数值存在归因偏差；credit 为 WorkBuddy 积分而非人民币。</div>
+    <div class="card full"><h3 data-i18n="cardCost">模型性价比排行（credit / 10万 token）</h3><div class="hint" data-i18n="hintCost">按模型聚合 credit 与 token；数值越低性价比越高。</div>
+      <div class="note" id="modelCostNote"></div>
       <div class="tbl-scroll"><table id="tModelCost"><thead><tr>
-        <th data-i18n="thModel2">模型</th><th class="num" data-i18n="thSessions">会话数</th><th class="num" data-i18n="thTotalToken">总 Token</th>
+        <th data-i18n="thModel2">模型</th><th class="num" id="thCostCount" data-i18n="thSessions">会话数</th><th class="num" data-i18n="thTotalToken">总 Token</th>
         <th class="num" data-i18n="thTotalCredit">总 Credit</th><th class="num" data-i18n="thCostPer100k">Credit / 1k token</th>
       </tr></thead><tbody></tbody></table></div>
       <div class="note" id="modelTips"></div>
     </div>
     <div class="card full"><h3 data-i18n="cardErrors">每日错误数</h3><div class="hint" data-i18n="hintErrors">span 级 status=error 的计数</div><canvas id="cErrors"></canvas></div>
+    <div class="card full" id="errDetailCard">
+      <h3>错误明细 <span class="est-badge local">全量</span>
+        <button class="ctrl-btn" id="btnErrCsv" type="button" style="float:right;margin-top:-3px;">导出 CSV</button>
+      </h3>
+      <div id="errDetail"></div>
+    </div>
   </div>
 
   <div class="note" id="note"></div>
@@ -136,7 +201,9 @@ const I18N = {
     cardDailyToken: "每日 Token 消耗", cardDailyCredit: "每日积分消耗（credit）", cardDailyThink: "每日思考用时（小时）",
     hintDailyToken: "按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。",
     hintDailyCredit: "本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。",
-    badgeLocal: "本地估算", badgePrecise: "精确（用量导出）",
+    hintDailyCreditPrecise: "精确：当前展示的每日 credit 已由上传的用量导出 xlsx 覆盖为服务端精确值（窗口内）；未覆盖日期仍为本地估算。",
+    xlsxUploadLabel: "上传用量导出 xlsx",
+    badgeLocal: "本地估算", badgePrecise: "精确（用量导出）", badgeApiPrecise: "精确（用量 API）",
     cardModelShare: "各模型 Token 占比", cardModelEff: "主要模型思考效率",
     cardScatter: "思考效率散点：思考用时 × 输出 token", cardTopSessions: "Top 10 会话",
     cardSpike: "用量高峰探查", cardCost: "模型性价比排行（credit / 10万 token）",
@@ -145,8 +212,8 @@ const I18N = {
     hintModelEff: "输出 token / 思考秒数",
     hintScatter: "每个点=一次请求；左上方=高产出低耗时=高效率",
     hintTopSessions: "会话标题 + 模型 + 思考用时 + credit 消耗",
-    hintSpike: "按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。会话表与模型构成均按当天请求统计，模型为当天实际请求模型。",
-    hintCost: "按模型聚合 credit 与 token；数值越低性价比越高。credit 与 token 均按会话主模型归因，会话内跨模型使用时数值存在归因偏差；credit 为 WorkBuddy 积分而非人民币。",
+    hintSpike: "按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。",
+    hintCost: "按模型聚合 credit 与 token；数值越低性价比越高。",
     hintErrors: "span 级 status=error 的计数",
     thSession: "会话标题", thModel: "模型", thReq: "请求数", thToken: "Token",
     thThink: "思考(分)", thCredit: "Credit", thErr: "错误", thStatus: "状态",
@@ -175,7 +242,9 @@ const I18N = {
     cardDailyToken: "Daily Token Usage", cardDailyCredit: "Daily Credit", cardDailyThink: "Daily Thinking Time (hours)",
     hintDailyToken: "Attributed by local timezone of each request's startedAt; reflects true daily token usage.",
     hintDailyCredit: "Local estimate: session-level credit has no per-day timestamp, attributed to the session's first-seen day by default; shape approximated, not exact. Provide a usage-export xlsx to override with precise values.",
-    badgeLocal: "Local estimate", badgePrecise: "Precise (export)",
+    hintDailyCreditPrecise: "Precise: daily credit in view is overridden by the uploaded usage-export xlsx (server-precise within window); uncovered days remain local estimate.",
+    xlsxUploadLabel: "Upload usage xlsx",
+    badgeLocal: "Local estimate", badgePrecise: "Precise (export)", badgeApiPrecise: "Precise (API)",
     cardModelShare: "Token Share by Model", cardModelEff: "Primary Model Thinking Efficiency",
     cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
     cardSpike: "Usage Spike Explorer", cardCost: "Model Cost Efficiency (credit / 100k token)",
@@ -184,8 +253,8 @@ const I18N = {
     hintModelEff: "output token / think seconds",
     hintScatter: "Each point = one request; top-left = high output, low time = efficient.",
     hintTopSessions: "Session title + model + think time + credit.",
-    hintSpike: "Days sorted by daily token total, highest first; breakdown: sessions on that day, model token mix, error rate, largest single request. Session table and model mix are both counted from that day's requests, with the actual request model.",
-    hintCost: "Credit & token aggregated by session primary model; lower = better cost efficiency. Cross-model sessions introduce attribution bias; credit is WorkBuddy internal credits, not currency.",
+    hintSpike: "Days sorted by daily token total, highest first; breakdown: sessions on that day, model token mix, error rate, largest single request.",
+    hintCost: "Credit & token aggregated by session primary model; lower = better cost efficiency.",
     hintErrors: "Count of spans with status=error.",
     thSession: "Session", thModel: "Model", thReq: "Requests", thToken: "Token",
     thThink: "Think(min)", thCredit: "Credit", thErr: "Err", thStatus: "Status",
@@ -227,11 +296,10 @@ function getCurRange(){
   return [startEl.value, endEl.value];
 }
 
-if(!T){ document.getElementById('sub').textContent='数据未加载：请重新运行 usage_extractor.py 生成自包含仪表盘。'; }
-else { init(); }
+// 引导调用 init() 已移至主脚本末尾，确保所有顶层 const（含 THEME_ORDER 等）初始化完成后再执行，避免暂时性死区（TDZ）报错。
 
 function fmt(n){ return (n||0).toLocaleString('en-US'); }
-function short(n){ if(n>=1e9)return (n/1e9).toFixed(2)+'B'; if(n>=1e6)return (n/1e6).toFixed(2)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'K'; return ''+n; }
+function short(n){ if(n>=1e9)return (n/1e9).toFixed(2)+'B'; if(n>=1e6)return (n/1e6).toFixed(2)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'K'; return (Math.round(n*10)/10).toFixed(1); }
 function esc(s){return (''+s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function dateMinMax(){
   const ds = T.by_day.map(d=>d.date).sort();
@@ -241,14 +309,279 @@ function dateMinMax(){
 // 注意：这仅决定初始/重置时的选中值，筛选器边界仍是全量范围（defaultRange ≤ dateMinMax）。
 function defaultRange(){
   const s = T.summary || {};
-  if (s.credit_xlsx_date_min && s.credit_xlsx_date_max){
-    return [s.credit_xlsx_date_min, s.credit_xlsx_date_max];
+  const wmin = s.billing_date_min || s.credit_xlsx_date_min;
+  const wmax = s.billing_date_max || s.credit_xlsx_date_max;
+  if (wmin && wmax){
+    return [wmin, wmax];
   }
   return dateMinMax();
 }
 function destroyCharts(){ charts.forEach(c=>c.destroy()); charts.length=0; }
 function between(v, lo, hi){ return (!lo||v>=lo) && (!hi||v<=hi); }
 
+// 主题（auto/light/dark）与皮肤（5 套预设）切换；选择持久化到 localStorage，切换时重渲染图表以套用新配色。
+const THEME_ORDER=['auto','light','dark'];
+const SKIN_ORDER=['azure','emerald','sunset','violet','rose'];
+function applyThemeSkin(){
+  let th='auto', sk='azure';
+  try{ th=localStorage.getItem('wb_theme')||'auto'; sk=localStorage.getItem('wb_skin')||'azure'; }catch(e){}
+  if(THEME_ORDER.indexOf(th)<0) th='auto';
+  if(SKIN_ORDER.indexOf(sk)<0) sk='azure';
+  document.documentElement.setAttribute('data-theme', th);
+  document.documentElement.setAttribute('data-skin', sk);
+  const tt=document.getElementById('themeSelect'); if(tt) tt.value=th;
+  const ss=document.getElementById('skinSelect'); if(ss) ss.value=sk;
+}
+function rerenderCharts(){ const [s,e]=getCurRange(); render(s,e); }
+
+// ---- 前端内联解析：上传用量导出 xlsx，覆盖每日 credit（与 Python --credit-xlsx 同口径）----
+// 零依赖：仅用浏览器原生 API（FileReader / DecompressionStream / DOMParser），文件不出本机。
+let sharedStrings = null;
+
+async function inflateRaw(bytes){
+  if (typeof DecompressionStream === 'undefined')
+    throw new Error('浏览器不支持 DecompressionStream，无法离线解析 xlsx（请用新版 Edge/Chrome，或改用 --credit-xlsx CLI）。');
+  const ds = new DecompressionStream('deflate-raw');
+  const w = ds.writable.getWriter(); w.write(bytes); w.close();
+  const r = ds.readable.getReader();
+  const chunks=[]; let total=0;
+  for(;;){ const {done,value}=await r.read(); if(done) break; if(value){chunks.push(value); total+=value.length;} }
+  const out=new Uint8Array(total); let off=0;
+  for(const c of chunks){ out.set(c, off); off+=c.length; }
+  return out;
+}
+function strFromU8(u){ return new TextDecoder('utf-8').decode(u); }
+
+// 扫描 zip 本地文件头，返回 {name: {method, data:Uint8Array}}（data 为已解压的 XML 字节）
+async function readZipEntries(buf){
+  const dv = new DataView(buf);
+  const entries = {};
+  const sig = 0x04034b50;
+  let off = 0;
+  while (off + 30 <= buf.byteLength){
+    let method, compSize, nameLen, extraLen, name, dataStart, data;
+    try {
+      if (dv.getUint32(off, true) !== sig){ off++; continue; }
+      method   = dv.getUint16(off+8, true);
+      compSize = dv.getUint32(off+18, true);
+      nameLen  = dv.getUint16(off+26, true);
+      extraLen = dv.getUint16(off+28, true);
+      name = strFromU8(new Uint8Array(buf, off+30, nameLen));
+      dataStart = off + 30 + nameLen + extraLen;
+      if (dataStart + compSize > buf.byteLength){ off++; continue; }
+      data = new Uint8Array(buf, dataStart, compSize);
+      if (method === 8) data = await inflateRaw(data); // 0=store 直接使用
+    } catch(e){ off++; continue; }
+    entries[name] = { method, data };
+    off = dataStart + compSize;
+  }
+  return entries;
+}
+
+function xmlText(el){
+  let s='';
+  if(!el) return s;
+  el.querySelectorAll('t, is t').forEach(t=>{ s += (t.textContent||''); });
+  return s;
+}
+
+// worksheet xml -> [{colLetter: value}]（与 Python _read_xlsx_rows 同口径）
+function parseSheetXml(xmlStr){
+  const doc = new DOMParser().parseFromString(xmlStr, 'application/xml');
+  if (doc.querySelector('parsererror')) return null;
+  const rows = [];
+  doc.querySelectorAll('sheetData > row').forEach(row=>{
+    const cells = {};
+    row.querySelectorAll('c').forEach(c=>{
+      const ref = c.getAttribute('r') || '';
+      const m = ref.match(/[A-Z]+/);
+      const col = m ? m[0] : null;
+      if(!col) return;
+      const t = c.getAttribute('t');
+      let val = '';
+      if (t === 's'){
+        const v = c.querySelector('v');
+        if (v && sharedStrings) val = sharedStrings[parseInt(v.textContent,10)] || '';
+      } else if (c.querySelector('is')) {
+        val = xmlText(c.querySelector('is'));
+      } else {
+        const v = c.querySelector('v');
+        if (v) val = v.textContent;
+      }
+      cells[col] = val;
+    });
+    rows.push(cells);
+  });
+  return rows;
+}
+
+function findXlsxCol(header, names){
+  for (const [col,val] of Object.entries(header||{})){
+    if (val && names.some(nm=> String(val).toLowerCase().includes(nm.toLowerCase()))) return col;
+  }
+  return null;
+}
+function toDay(tv){
+  if(!tv) return null;
+  tv = String(tv).trim();
+  const m = tv.match(/^(\d{4}-\d{2}-\d{2})[ T]\d{2}:\d{2}:\d{2}/);
+  if (m) return m[1];
+  if (tv.length>=10 && /^\d{4}-\d{2}-\d{2}/.test(tv)) return tv.slice(0,10);
+  const t = Date.parse(tv);
+  if (!isNaN(t)) return new Date(t).toISOString().slice(0,10);
+  return null;
+}
+
+// 主入口：读文件 -> { byDay:{day:credit}, byModel:{model:{credit,count}} }
+// byDay 与 Python read_credit_xlsx 同口径；byModel 与 read_credit_xlsx_by_model 同口径（按模型精确 credit + 请求数）
+async function parseCreditXlsxFile(file){
+  const buf = await file.arrayBuffer();
+  const entries = await readZipEntries(buf);
+  sharedStrings = [];
+  if (entries['xl/sharedStrings.xml']){
+    const doc = new DOMParser().parseFromString(strFromU8(entries['xl/sharedStrings.xml'].data), 'application/xml');
+    doc.querySelectorAll('sst > si').forEach(si=>{ sharedStrings.push(xmlText(si)); });
+  }
+  let sheetName = 'xl/worksheets/sheet1.xml';
+  const cands = Object.keys(entries).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort();
+  if (!entries[sheetName] && cands.length) sheetName = cands[0];
+  if (!entries[sheetName]) throw new Error('xlsx 未找到 worksheet');
+  const rows = parseSheetXml(strFromU8(entries[sheetName].data));
+  if (!rows || !rows.length) throw new Error('xlsx 解析失败或为空');
+  const header = rows[0];
+  const crC = findXlsxCol(header, ['积分消耗','credit']);
+  const tmC = findXlsxCol(header, ['时间','time']);
+  const mdC = findXlsxCol(header, ['模型','model']);
+  if (!crC || !tmC) throw new Error('xlsx 缺少必要列（积分消耗/credit、时间/time）');
+  const byDay = {};
+  const byModel = {};
+  for (let i=1;i<rows.length;i++){
+    const cells = rows[i];
+    let credit;
+    try { credit = parseFloat(String(cells[crC])); } catch(e){ credit = NaN; }
+    if (isNaN(credit)) continue;
+    const day = toDay(cells[tmC]);
+    if (day) byDay[day] = (byDay[day]||0) + credit;
+    const model = (mdC != null && cells[mdC] != null) ? String(cells[mdC]).trim() : '';
+    if (model){
+      if (!byModel[model]) byModel[model] = {credit:0, count:0};
+      byModel[model].credit += credit;
+      byModel[model].count += 1;
+    }
+  }
+  return {byDay, byModel};
+}
+
+async function handleXlsxUpload(file){
+  const statusEl = document.getElementById('xlsxStatus');
+  if (!statusEl) return;
+  if (!file) return;
+  statusEl.className = 'xlsx-status';
+  statusEl.textContent = (LANG==='en') ? 'Parsing xlsx…' : '正在解析 xlsx…';
+  try {
+    const parsed = await parseCreditXlsxFile(file);
+    const xmap = parsed.byDay;
+    const xmodel = parsed.byModel;
+    if (!xmap || !Object.keys(xmap).length){
+      statusEl.className = 'xlsx-status err';
+      statusEl.textContent = (LANG==='en') ? 'No valid rows (need 时间/time & 积分消耗/credit).' : '无有效行（需要 时间/time 与 积分消耗/credit 列）。';
+      return;
+    }
+    let covered = 0;
+    (T.by_day||[]).forEach(b=>{
+      if (Object.prototype.hasOwnProperty.call(xmap, b.date)){
+        b.credit = Math.round((xmap[b.date]||0)*100)/100;
+        covered++;
+      }
+    });
+    const s = (T.summary = T.summary || {});
+    if (covered){
+      s.credit_source = 'xlsx_precise';
+      s.credit_note = (LANG==='en')
+        ? `credit overridden by uploaded xlsx for ${covered} day(s) (server-precise in window); other days remain local estimate.`
+        : `credit 已用上传的用量导出 xlsx 精确覆盖 ${covered} 天（窗口内为服务端精确值）；未覆盖日期仍为本地估算。`;
+      const days = Object.keys(xmap).sort();
+      s.credit_xlsx_date_min = days[0];
+      s.credit_xlsx_date_max = days[days.length-1];
+      // 按模型精确表：xlsx 提供每模型 credit + 请求数，借同窗口本地 token 算性价比（与 CLI --credit-xlsx 同口径）
+      if (xmodel && Object.keys(xmodel).length){
+        const wmin = s.credit_xlsx_date_min, wmax = s.credit_xlsx_date_max;
+        const winTokens = {};
+        (T.by_session||[]).forEach(sb=>{
+          const m = sb.model || '';
+          if (!m) return;
+          const d = sb.first_date;
+          if (wmin && wmax && d >= wmin && d <= wmax) winTokens[m] = (winTokens[m]||0) + (sb.tokens||0);
+        });
+        const list = [];
+        for (const [m, info] of Object.entries(xmodel)){
+          const tk = winTokens[m] || 0;
+          const cr = Math.round(info.credit*100)/100;
+          list.push({
+            model: m,
+            requests: info.count,
+            tokens: tk,
+            credit: cr,
+            credit_per_100k: tk ? Math.round(cr/tk*100000*100)/100 : null,
+            zero_credit: (cr <= 0 && tk >= 1_000_000)
+          });
+        }
+        list.sort((a,b)=>{ const av=(a.credit_per_100k==null)?Infinity:a.credit_per_100k; const bv=(b.credit_per_100k==null)?Infinity:b.credit_per_100k; return av-bv; });
+        T.model_cost_official = list;
+      }
+      // 适配文件日期区间：把可见范围收敛到 xlsx 窗口（与 CLI --credit-xlsx 在 init 时的 defaultRange 行为一致）；
+      // 用户仍可手动把筛选器拉宽回看全量 token 历史。
+      const startEl = document.getElementById('startDate');
+      const endEl = document.getElementById('endDate');
+      if (startEl && endEl && s.credit_xlsx_date_min && s.credit_xlsx_date_max){
+        startEl.value = s.credit_xlsx_date_min;
+        endEl.value = s.credit_xlsx_date_max;
+        render(s.credit_xlsx_date_min, s.credit_xlsx_date_max);
+      } else {
+        rerenderCharts();
+      }
+    } else {
+      if (s.credit_source !== 'api_precise') s.credit_source = 'local_estimate';
+      s.credit_note = (LANG==='en') ? 'Uploaded xlsx has no overlapping dates; credit stays local estimate.' : '上传的 xlsx 未包含与本地数据重叠的日期，credit 仍为本地估算。';
+      rerenderCharts();
+    }
+    s.creditTotal = Math.round((T.by_day||[]).reduce((a,b)=>a+(b.credit||0),0)*100)/100;
+    statusEl.className = 'xlsx-status';
+    statusEl.textContent = (LANG==='en')
+      ? (covered ? `xlsx loaded: ${covered} day(s) overridden with precise credit; view focused to ${s.credit_xlsx_date_min} ~ ${s.credit_xlsx_date_max}.` : `xlsx loaded: ${covered} day(s) overridden.`)
+      : (covered ? `已加载 xlsx：精确覆盖 ${covered} 天 credit；已聚焦文件区间 ${s.credit_xlsx_date_min} ~ ${s.credit_xlsx_date_max}。` : `已加载 xlsx：精确覆盖 ${covered} 天 credit。`);
+  } catch(e){
+    statusEl.className = 'xlsx-status err';
+    const msg = (e && e.message) ? e.message : (''+e);
+    statusEl.textContent = (LANG==='en') ? ('xlsx parse failed: ' + msg) : ('xlsx 解析失败：' + msg);
+  }
+}
+function setupThemeSkin(){
+  applyThemeSkin();
+  const tt=document.getElementById('themeSelect');
+  if(tt) tt.addEventListener('change',()=>{
+    const th=tt.value;
+    document.documentElement.setAttribute('data-theme', th);
+    try{ localStorage.setItem('wb_theme', th); }catch(e){}
+    rerenderCharts();
+  });
+  const ss=document.getElementById('skinSelect');
+  if(ss) ss.addEventListener('change',()=>{
+    const sk=ss.value;
+    document.documentElement.setAttribute('data-skin', sk);
+    try{ localStorage.setItem('wb_skin', sk); }catch(e){}
+    rerenderCharts();
+  });
+}
+
+function showDateError(msg){
+  const el = document.getElementById('dateErr');
+  if(el){ el.textContent = '⚠ ' + msg; el.style.display = 'inline'; }
+}
+function clearDateError(){
+  const el = document.getElementById('dateErr');
+  if(el){ el.textContent = ''; el.style.display = 'none'; }
+}
 function init(){
   const [minD, maxD] = dateMinMax();   // 筛选器边界 = 全量数据范围
   const [dMin, dMax] = defaultRange(); // 默认选中值 = xlsx 窗口（若提供）否则全量
@@ -258,11 +591,19 @@ function init(){
   startEl.min = minD; startEl.max = maxD;
   endEl.min = minD; endEl.max = maxD;
   startEl.addEventListener('change',()=>{
-    if(startEl.value>endEl.value) endEl.value=startEl.value;
+    if(startEl.value && endEl.value && startEl.value > endEl.value){
+      showDateError('起始日期不能晚于结束日期，请修正。');
+      return;  // 不静默重置、不渲染
+    }
+    clearDateError();
     render(startEl.value, endEl.value);
   });
   endEl.addEventListener('change',()=>{
-    if(endEl.value<startEl.value) startEl.value=endEl.value;
+    if(startEl.value && endEl.value && endEl.value < startEl.value){
+      showDateError('结束日期不能早于起始日期，请修正。');
+      return;  // 不静默重置、不渲染
+    }
+    clearDateError();
     render(startEl.value, endEl.value);
   });
   document.getElementById('langToggle').addEventListener('click',()=>{
@@ -272,7 +613,15 @@ function init(){
     applyStaticLang();
     render(s,e);
   });
+  setupThemeSkin();
   applyStaticLang();
+  const btnErrCsv = document.getElementById('btnErrCsv');
+  if(btnErrCsv) btnErrCsv.addEventListener('click', exportErrorCsv);
+  const xlsxFileEl = document.getElementById('xlsxFile');
+  if (xlsxFileEl) xlsxFileEl.addEventListener('change', ()=>{
+    if (xlsxFileEl.files && xlsxFileEl.files[0]) handleXlsxUpload(xlsxFileEl.files[0]);
+    else { const st=document.getElementById('xlsxStatus'); if(st) st.textContent=''; }
+  });
   render(minD, maxD);
   renderWarnings();
 }
@@ -322,6 +671,11 @@ function buildBuckets(dayFilt, gran){
 }
 
 function render(start, end){
+  if (start && end && start > end){
+    showDateError('起始日期不能晚于结束日期，请修正。');
+    return;  // 无效范围：保留上一次有效渲染，不画垃圾图
+  }
+  clearDateError();
   const s=T.summary;
   const cs = (s && s.credit_source) || 'local_estimate';
   const hasFilter = start && end && (start!==defaultRange()[0] || end!==defaultRange()[1]);
@@ -364,28 +718,36 @@ function render(start, end){
     ` ｜ ${t('subGran')} ${glS}`;
 
   const app=document.getElementById('app'); app.style.display='block';
+  const topErr = (T.error_detail && T.error_detail.top_messages && T.error_detail.top_messages[0]) || null;
   const kpis=[
     {label:t('kpiRequests'),val:fmt(kpi.requests)},
     {label:t('kpiToken'),val:short(kpi.tokens),unit:fmt(kpi.tokens)},
     {label:t('kpiThink'),val:kpi.thinking_hours,unit:t('unitHour')},
     {label:t('kpiEff'),val:kpi.eff,unit:t('unitTokS')},
     {label:t('kpiCredit'),val:short(kpi.credit)},
-    {label:t('kpiErr'),val:fmt(kpi.errors),err:kpi.errors>0},
+    {label:t('kpiErr'),val:fmt(kpi.errors),err:kpi.errors>0,
+      hint: ''},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
     `<div class="kpi"><div class="label">${k.label}</div>
-     <div class="val ${k.err?'err':''}">${k.val}${k.est?'<span class="est" title="本地估算">≈</span>':''}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div></div>`).join('');
+     <div class="val ${k.err?'err':''}">${k.val}${k.est?'<span class="est" title="本地估算">≈</span>':''}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div>
+     ${k.hint?`<div class="kpi-hint ${k.err?'err':''}">${esc(k.hint)}</div>`:''}</div>`).join('');
 
   const dayFilt = T.by_day.filter(d => inRange(d.date));
   // 时间轴自适应粒度：按筛选范围跨度选择桶（granInfo/glT/glS 已在 render 顶部定义），再聚合。
   const buckets = buildBuckets(dayFilt, granInfo.gran);
-  const grid={color:'#2a2f3a'};
-  Chart.defaults.color='#9aa3b2';
-  Chart.defaults.borderColor='#333845';
+  const rs=getComputedStyle(document.documentElement);
+  const gridColor=rs.getPropertyValue('--c-grid').trim()||'#2a2f3a';
+  const axisColor=rs.getPropertyValue('--c-axis').trim()||'#9aa3b2';
+  const accent=rs.getPropertyValue('--accent').trim()||'#4f9dff';
+  const accentRgb=rs.getPropertyValue('--accent-rgb').trim()||'79,157,255';
+  const grid={color:gridColor};
+  Chart.defaults.color=axisColor;
+  Chart.defaults.borderColor=gridColor;
   Chart.defaults.font.family='-apple-system,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif';
 
   // 时间轴粒度自适应：更新 4 张时序图的标题与提示
-  const cardTitle = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('h3'); if(h) h.textContent = zh?zhTxt:enTxt;} };
+  const cardTitle = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('h3'); if(h){ h.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; }); h.prepend(document.createTextNode(zh?zhTxt:enTxt)); } } };
   const cardHint = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('.hint'); if(h) h.textContent = zh?zhTxt:enTxt;} };
   cardTitle('cDailyToken', glT+' Token 消耗', glT+' Token Usage');
   cardTitle('cDailyCredit', glT+' 积分消耗（credit）', glT+' Credit');
@@ -393,35 +755,36 @@ function render(start, end){
   cardTitle('cErrors', glT+' 错误数', glT+' Errors');
   if (gkey === 'day'){
     cardHint('cDailyToken', t('hintDailyToken'), t('hintDailyToken'));
-    cardHint('cDailyCredit', t('hintDailyCredit'), t('hintDailyCredit'));
+    if (cs === 'xlsx_precise') cardHint('cDailyCredit', t('hintDailyCreditPrecise'), t('hintDailyCreditPrecise'));
+    else cardHint('cDailyCredit', t('hintDailyCredit'), t('hintDailyCredit'));
   } else {
-    cardHint('cDailyToken', `${glT} Token 总量（先按本地时区归日，再按${glS}聚合）。`, `${glT} total tokens (day-attributed by local timezone, then aggregated ${glS}).`);
-    cardHint('cDailyCredit', `${glT} credit 总量（本地估算/精确，按${glS}聚合；趋势形状近似）。`, `${glT} total credit (local estimate or precise, aggregated ${glS}; shape approximated).`);
+    cardHint('cDailyCredit', `${glT} credit 总量。`, `${glT} total credit.`);
   }
 
   destroyCharts();
 
   // 每日 token（主角指标，本地精确）—— 按当前粒度桶聚合
   charts.push(new Chart(cDailyToken,{type:'line',data:{labels:buckets.map(b=>b.label),
-    datasets:[{label:t('dsToken'),data:buckets.map(b=>b.tokens),borderColor:'#4f9dff',
-      backgroundColor:'rgba(79,157,255,.15)',fill:true,tension:.3,pointRadius:2}]},
+    datasets:[{label:t('dsToken'),data:buckets.map(b=>b.tokens),borderColor:accent,
+      backgroundColor:'rgba('+accentRgb+',.15)',fill:true,tension:.3,pointRadius:2}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 每日 credit（估算 / 精确，取决于是否提供 xlsx）—— 按当前粒度桶聚合
+  // 每日 credit（估算 / 精确，取决于是否提供 xlsx 或用量 API token）—— 按当前粒度桶聚合
   const creditBadge = document.getElementById('creditBadge');
   if (creditBadge){
-    if (cs === 'xlsx_precise'){ creditBadge.textContent = t('badgePrecise'); creditBadge.className = 'est-badge precise'; }
+    if (cs === 'api_precise'){ creditBadge.textContent = t('badgeApiPrecise'); creditBadge.className = 'est-badge precise'; }
+    else if (cs === 'xlsx_precise'){ creditBadge.textContent = t('badgePrecise'); creditBadge.className = 'est-badge precise'; }
     else { creditBadge.textContent = t('badgeLocal'); creditBadge.className = 'est-badge local'; }
   }
   charts.push(new Chart(cDailyCredit,{type:'line',data:{labels:buckets.map(b=>b.label),
-    datasets:[{label:t('dsCredit'),data:buckets.map(b=>b.credit),borderColor:'#ffcc66',
-      backgroundColor:'rgba(255,204,102,.15)',fill:true,tension:.3,pointRadius:2}]},
+    datasets:[{label:t('dsCredit'),data:buckets.map(b=>b.credit),borderColor:accent,
+      backgroundColor:'rgba('+accentRgb+',.15)',fill:true,tension:.3,pointRadius:2}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
   // 每日思考用时 —— 按当前粒度桶聚合
   charts.push(new Chart(cDailyThink,{type:'bar',data:{labels:buckets.map(b=>b.label),
     datasets:[{label:t('dsThink'),data:buckets.map(b=>(b.thinking_sec/3600).toFixed(2)),
-      backgroundColor:'#b58cff'}]},
+      backgroundColor:accent}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
   // 模型占比 Top10 + 其他
@@ -437,14 +800,14 @@ function render(start, end){
   const topEff = topN(eff.map(m=>({key:m.model,val:m.efficiency})).filter(x=>x.val>0), 10);
   charts.push(new Chart(cModelEff,{type:'bar',data:{labels:topEff.labels,
     datasets:[{label:t('dsTokS'),data:topEff.data,
-      backgroundColor:'#3ecf8e'}]},
+      backgroundColor:accent}]},
     options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
   // 散点
   const pts=T.requests_sample.filter(r=>inRange(r.date)).map(r=>({x:+(r.thinking_sec).toFixed(1),y:r.output,
     m:r.model,t:r.tokens}));
   charts.push(new Chart(cScatter,{type:'scatter',data:{datasets:[{label:t('dsReq'),data:pts,
-    backgroundColor:'rgba(79,157,255,.5)',pointRadius:4}]},
+    backgroundColor:'rgba('+accentRgb+',.5)',pointRadius:4}]},
     options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>
       `${t('scatterModel')} ${c.raw.m} | ${t('scatterThink')} ${c.raw.x}s | ${t('scatterOutput')} ${fmt(c.raw.y)} tok`}}},
       scales:{x:{title:{display:true,text:t('xThink')},grid},
@@ -465,35 +828,64 @@ function render(start, end){
     <td class="num ${x.errors?'err':''}">${x.errors}</td>
     <td>${esc(x.status||'')}</td></tr>`).join('');
 
-  // 模型性价比表（按会话级 model，受日期筛选影响）
-  const costMap = {};
-  sessFilt.forEach(sb=>{
-    const m = sb.model || 'unknown';
-    if(!costMap[m]) costMap[m] = {model:m, sessions:0, tokens:0, credit:0};
-    costMap[m].sessions += 1;
-    costMap[m].tokens += sb.tokens||0;
-    costMap[m].credit += sb.credit||0;
-  });
-  let costList = Object.values(costMap)
-    .filter(m => m.model !== 'unknown' && m.tokens > 0)
-    .map(m => ({...m, credit_per_100k: m.tokens ? Math.round(m.credit/m.tokens*1e7)/100 : 0}))
-    .filter(m => m.credit_per_100k > 0);  // 0 值行（免费/未计费模型）无性价比意义，不展示
-  costList.sort((a,b)=>a.credit_per_100k - b.credit_per_100k);
+  // 模型性价比表
+  // 官方用量导出（服务端逐请求精确 credit）优先；无导出时回退本地会话级归因。
+  // 本地归因把「整会话 credit」全归给 sessions.model，同一会话混用免费/付费模型时
+  // 会把付费 credit 错记到免费模型上（hy3 因此虚高到数千），故有官方数据时以官方为准。
+  const offList = T.model_cost_official || [];
+  const useOfficial = offList.length > 0;
+  let costList = [];
+  let costSrcNote = '';
+  if (useOfficial) {
+    costList = offList
+      .filter(m => m.model && m.model !== 'unknown')
+      .map(m => ({...m, sessions: m.requests}));
+    const wmin = (T.summary && (T.summary.billing_date_min || T.summary.credit_xlsx_date_min)) || '';
+    const wmax = (T.summary && (T.summary.billing_date_max || T.summary.credit_xlsx_date_max)) || '';
+    costSrcNote = wmin ? (cs==='api_precise' ? `官方精确（用量 API）· 窗口 ${wmin} ~ ${wmax}` : `官方精确（用量导出）· 窗口 ${wmin} ~ ${wmax}`) : (cs==='api_precise' ? '官方精确（用量 API）' : '官方精确（用量导出）');
+    // credit/10万token 为 null 表示本地无该模型 token（如图像模型），排到最后
+    costList.sort((a,b)=>{
+      const av = (a.credit_per_100k == null) ? Infinity : a.credit_per_100k;
+      const bv = (b.credit_per_100k == null) ? Infinity : b.credit_per_100k;
+      return av - bv;
+    });
+  } else {
+    const costMap = {};
+    sessFilt.forEach(sb=>{
+      const m = sb.model || 'unknown';
+      if(!costMap[m]) costMap[m] = {model:m, sessions:0, tokens:0, credit:0};
+      costMap[m].sessions += 1;
+      costMap[m].tokens += sb.tokens||0;
+      costMap[m].credit += sb.credit||0;
+    });
+    costList = Object.values(costMap)
+      .filter(m => m.model !== 'unknown' && m.tokens > 0)
+      .map(m => ({...m, credit_per_100k: m.tokens ? Math.round(m.credit/m.tokens*1e7)/100 : 0}))
+      .filter(m => m.credit_per_100k > 0);  // 本地口径下 0 值行无性价比意义，不展示
+    costList.sort((a,b)=>a.credit_per_100k - b.credit_per_100k);
+  }
 
   const tmc = document.querySelector('#tModelCost tbody');
+  const costNoteEl = document.getElementById('modelCostNote');
+  if (costNoteEl) costNoteEl.textContent = costSrcNote || '';
+  // 官方口径下该列是「请求数」（xlsx 无 sessionId，无法还原会话数），本地口径才是会话数
+  const thCostCount = document.getElementById('thCostCount');
+  if (thCostCount) thCostCount.textContent = useOfficial ? t('thReq') : t('thSessions');
   if (costList.length) {
-    const best = Math.min.apply(null, costList.map(m => m.credit_per_100k));
-    const worst = Math.max.apply(null, costList.map(m => m.credit_per_100k));
+    const nums = costList.map(m => m.credit_per_100k).filter(v => typeof v === 'number' && v > 0);
+    const best = nums.length ? Math.min.apply(null, nums) : null;
+    const worst = nums.length ? Math.max.apply(null, nums) : null;
     tmc.innerHTML = costList.map(m => {
-      const col = (m.credit_per_100k === best) ? 'var(--green)'
-                : (m.credit_per_100k === worst) ? 'var(--red)' : '';
+      const v = m.credit_per_100k;
+      const col = (best !== null && v === best) ? 'var(--green)'
+                : (worst !== null && v === worst) ? 'var(--red)' : '';
       const promo = (m.credit === 0 && m.tokens >= 1_000_000) ? '<span class="zero-credit">(限免/促销)</span>' : '';
       return `<tr>
         <td><span class="tag">${esc(m.model)}</span>${promo}</td>
-        <td class="num">${m.sessions}</td>
+        <td class="num">${m.sessions ?? 0}</td>
         <td class="num">${fmt(m.tokens)}</td>
-        <td class="num">${m.credit.toFixed(2)}</td>
-        <td class="num" style="color:${col};font-weight:600">${m.credit_per_100k}</td>
+        <td class="num">${(m.credit ?? 0).toFixed(2)}</td>
+        <td class="num" style="color:${col};font-weight:600">${(v == null) ? '—' : v}</td>
       </tr>`;
     }).join('');
   } else {
@@ -525,9 +917,87 @@ function render(start, end){
 
   document.getElementById('note').textContent = t('bottomNote');
   renderSpikeDays();
+  renderErrorDetail();
 }
 
-// 用量高峰探查: 渲染按当天 token 总量排序最高的几天, 逐日拆解成因(不受日期筛选影响, 始终基于全量)
+// 错误明细：把原本只计数的错误升级为可下钻的分类统计（基于全量数据，不受日期筛选影响）
+function renderErrorDetail(){
+  const host = document.getElementById('errDetail');
+  if(!host) return;
+  const ed = T.error_detail;
+  const btn = document.getElementById('btnErrCsv');
+  if(!ed || !ed.total){
+    host.innerHTML = `<div class="note">全量数据下无错误记录。</div>`;
+    if(btn) btn.disabled = true;
+    return;
+  }
+  if(btn) btn.disabled = false;
+  const pct = c => (ed.total ? (c / ed.total * 100).toFixed(1) : '0.0') + '%';
+  const msgRows = (ed.top_messages||[]).map(x =>
+    `<tr><td>${esc(x.msg)}</td><td class="num">${x.count}</td><td class="num">${pct(x.count)}</td></tr>`).join('')
+    || `<tr><td colspan="3">无</td></tr>`;
+  const topMsg = (ed.top_messages[0] && ed.top_messages[0].msg) ? ed.top_messages[0].msg : '—';
+  const topCnt = ed.top_messages[0] ? ed.top_messages[0].count : 0;
+  host.innerHTML = `
+    <div class="note">全量错误 <b>${ed.total}</b> 次。最高频错误：<b>${esc(topMsg)}</b>（${topCnt} 次，占 ${pct(topCnt)}）</div>
+    <div class="spike-body">
+      <div class="spike-col"><div class="spike-sub">高频错误信息</div>
+        <table><thead><tr><th>错误信息</th><th class="num">次数</th><th class="num">占比</th></tr></thead><tbody>${msgRows}</tbody></table></div>
+    </div>
+    <div class="note" style="margin-top:10px;font-size:11px;color:var(--muted);">其余分类（按类型 / 工具 / 模型 / 会话 / 近期样本）已包含在「导出 CSV」中。</div>
+  `;
+}
+
+// CSV 单元格转义：含逗号/引号/换行的字段加双引号包裹，内部双引号翻倍
+function csvCell(v){
+  const s = (v===null||v===undefined) ? '' : (''+v);
+  if(/[",\n\r]/.test(s)) return '"'+s.replace(/"/g,'""')+'"';
+  return s;
+}
+
+// 错误明细 CSV 导出：把 6 个分类统计合并为一个带分节标题的 CSV（含 BOM，Excel 中文不乱码）
+function exportErrorCsv(){
+  const ed = T.error_detail;
+  if(!ed || !ed.total){ alert('无错误数据可导出。'); return; }
+  const lines = [];
+  const push = arr => lines.push(arr.map(csvCell).join(','));
+  const pct = c => (ed.total ? (c / ed.total * 100).toFixed(1) + '%' : '0.0%');
+  lines.push('# 错误明细导出（全量，不受日期筛选影响）');
+  lines.push('# 生成时间：' + new Date().toISOString());
+  lines.push('# 全量错误总数：' + ed.total);
+  lines.push('');
+  lines.push('## 高频错误信息');
+  push(['错误信息','次数','占比']);
+  (ed.top_messages||[]).forEach(x => push([x.msg, x.count, pct(x.count)]));
+  lines.push('');
+  lines.push('## 按错误类型');
+  push(['类型','次数']);
+  (ed.by_type||[]).forEach(x => push([x.type, x.count]));
+  lines.push('');
+  lines.push('## 按工具');
+  push(['工具','次数']);
+  (ed.by_tool||[]).forEach(x => push([x.tool, x.count]));
+  lines.push('');
+  lines.push('## 按模型');
+  push(['模型','次数','主导错误']);
+  (ed.by_model||[]).forEach(x => push([x.model, x.count, x.top_msg]));
+  lines.push('');
+  lines.push('## 按会话');
+  push(['会话','次数','主导错误']);
+  (ed.by_session||[]).forEach(x => push([x.title || '(无标题)', x.count, x.top_msg]));
+  lines.push('');
+  lines.push('## 近期错误样本');
+  push(['日期','会话ID','模型','工具','错误信息']);
+  (ed.samples||[]).forEach(x => push([x.date, x.session_id, x.model, x.tool, x.msg]));
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'workbuddy-error-detail-' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
 function renderSpikeDays(){
   const host = document.getElementById('spikeDays');
   if(!host) return;
@@ -547,6 +1017,7 @@ function renderSpikeDays(){
         <span class="tag">${t('spikeErrRate')} ${s.err_rate}%</span>
         <span class="tag">${t('spikeAvgCalls')} ${s.avg_calls}</span>
         <span class="tag">${t('spikeMaxReq')} ${short(s.max_request_tokens)} tok</span>
+        ${s.top_error_msg ? `<span class="tag">主导错误 ${esc(s.top_error_msg)}</span>` : ''}
       </div>
       <div class="spike-body">
         <div class="spike-col"><div class="spike-sub">${t('spikeSubSessions')}</div>
@@ -602,6 +1073,21 @@ function topN(arr, n){
   const top = arr.slice(0, n);
   return {labels: top.map(x=>x.key||x.model), data: top.map(x=>x.val||x.tokens)};
 }
+
+// === 引导入口：置于主脚本末尾，确保所有顶层 const（含 THEME_ORDER / THEME_LABEL / SKIN_ORDER）已初始化，避免 TDZ 报错 ===
+if(!T){ document.getElementById('sub').textContent='数据未加载：请重新运行 usage_extractor.py 生成自包含仪表盘。'; }
+else {
+  try { init(); }
+  catch(e){
+    var msg = (e && e.message) ? e.message : (''+e);
+    var subEl = document.getElementById('sub');
+    if(subEl) subEl.innerHTML = '<span class="err">渲染出错：' + esc(msg) + '</span>';
+    if (typeof console !== 'undefined' && console.error) console.error(e);
+  }
+}
 </script>
+<p style="text-align:center; color:#888; font-size:12px; margin-top:20px; padding:10px; border-top:1px solid #eee;">
+⭐ 喜欢这个看板？来 GitHub 点个 Star 支持独立开发：<a href="https://github.com/clancy-feng/workbuddy-usage-status" target="_blank" style="color:#0366d6;">github.com/clancy-feng/workbuddy-usage-status</a>
+</p>
 </body>
 </html>
