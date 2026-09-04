@@ -17,9 +17,43 @@ metadata:
     requires.env: []
 ---
 
-# WorkBuddy Usage Status —— Agent 执行指令
+# 
 
-本技能是给 AI 的执行说明书，用户视角的安装、读图、故障排查见 `README.md`；指标算法口径见 `DATA-GUIDE.md`。
+## 💖 支持这个项目
+
+> 📊 已被 **1600+** WorkBuddy 用户下载使用，覆盖 SkillHub & ClawHub 双平台。
+
+如果这个工具帮到了你，欢迎：
+
+- ⭐ 去 GitHub 点个 Star（这是对我最大的鼓励）
+- 🐛 遇到问题提 Issue
+- 📢 分享给你的 WorkBuddy 用户朋友
+
+**GitHub**：<https://github.com/clancy-feng/workbuddy-usage-status>
+
+## 界面预览
+
+![preview](https://raw.githubusercontent.com/clancy-feng/workbuddy-usage-status/refs/heads/main/dashboard-preview-1.png)
+
+## 技能简介
+
+把 WorkBuddy 自己的本地使用数据，变成一份离线可查的 Dashboard。
+
+可以看到：token 消耗、思考用时、思考效率、模型分布、错误数、credit 消耗。
+
+## ✨ 核心功能特性
+
+- Token/Credit 全链路可视化：按模型、按日期、按会话统计，一眼定位"烧钱大户"
+- 用量高峰探查：自动按 credit 排序列出最高的几天，逐日拆解主导会话、模型 token 构成、错误率、最大单次请求——精确到"哪一天花了多少"，帮你快速定位消耗集中日
+- 思考效率量化：输出 token ÷ 思考秒数（tok/s），横向对比模型性价比
+- 错误集中监控：快速定位报错频繁的会话/模型，降低调试成本，可导出错误详情。
+- 离线运行：Chart.js 已内联，单文件 HTML 双击即看
+- 只读无侵入：以只读模式访问 WorkBuddy 数据，不影响正在运行的程序
+- 跨平台兼容：支持 Windows/macOS/Linux，Python 3.10+ 即可运行
+
+## WorkBuddy Usage Status —— Agent 执行指令
+
+本文件是给 AI 的执行说明书，用户视角的安装、读图、故障排查见 `README.md`；指标算法口径见 `DATA-GUIDE.md`。
 
 ## 触发条件
 

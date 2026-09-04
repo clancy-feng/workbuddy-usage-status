@@ -1,31 +1,32 @@
 > **Skill Overview**
->
+> 
 > WorkBuddy Usage Status turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. It ranks model cost-performance (credit per 1k tokens) with switching suggestions so you can pick the cheapest model, and now supports a date-range filter so you can zoom into any period. All model-share charts are limited to the top 10 models with the rest grouped as "Other". All data stays on your machine under `~/.workbuddy/`; **default zero network, no external APIs**. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies. An optional **opt-in** mode can pull precise credit from WorkBuddy's official usage API using a token you manually export from your own browser (never auto-read from the host App) — see §6 known limits.
->
+> 
 > **What it does**: Offline dashboard for WorkBuddy's local usage data — token / credit consumption, thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, and usage-spike analysis. Purely local **by default**, zero network dependency; an optional opt-in flag can fetch precise credit via the official usage API with a user-supplied token (disabled by default, never auto-reads host credentials).
->
+> 
 > **Recent updates**:
->
+> 
 > - **Color scheme selection** — switch between Light / Dark / system-following themes, plus several icon palettes.
 > - **Detailed credit analysis (xlsx)** — import a usage-export xlsx for precise per-day and per-model credit breakdowns.
->
+> 
 > **How to install**
->
+> 
 > ```
 > clawhub install workbuddy-usage-status
 > ```
->
+> 
 > **How to use**
->
+> 
 > - **Chat trigger (natural language):** Describe what you want in plain English or Chinese — WorkBuddy detects this skill by *meaning*, not a fixed keyword list. Anything expressing *viewing, generating, or exporting your WorkBuddy usage status / stats / activity dashboard* will trigger it. Examples:
->
+>   
 >   "generate a WorkBuddy usage dashboard" · "view my recent WorkBuddy usage status" · "show token / credit consumption and model distribution" · "which model is the most cost-effective" · "filter usage by date range" · "which day had the highest usage"
->
+>   
 >   Scope is limited to WorkBuddy's own local usage data.
+> 
 > - **CLI:** `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`). Python 3.10+, standard library only. Windows users please replace `python3` with `python`.
->
+> 
 > ⭐ If this dashboard helped you see your WorkBuddy usage clearly, please give it a Star to support independent development: [github.com/clancy-feng/workbuddy-usage-status](https://github.com/clancy-feng/workbuddy-usage-status)
->
+> 
 > The full Chinese documentation is preserved below.
 
 ---
@@ -33,14 +34,6 @@
 把 WorkBuddy 自己的本地使用数据，变成一份离线可查的 Dashboard。
 
 可以看到：token 消耗、思考用时、思考效率、模型分布、错误数、credit 消耗。
-
-## 📸 看板预览
-
-> 以下为 Dashboard 实际渲染效果（图片为仓库相对路径，在 Gitee / GitHub 页面与本地均可直接显示）：
-
-![看板预览 1](dashboard-preview-1.png)
-
-![看板预览 2](dashboard-preview-2.png)
 
 ## ✨ 核心功能特性
 
@@ -137,7 +130,6 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 
 打开最新生成的 `workbuddy-usage-status-dashboard-*.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 Token消耗会话表 + 每日错误。四张时序图的横轴会按所选日期范围的跨度自动在「日 / 周 / 月」之间切换（≤120 天按日，120–730 天按周，>730 天按月），日期选择在修改起止日期后看板立即刷新。
 
-
 ### 精确化 credit（可选）
 
 > 本地 `credit_json` 没有逐日时间戳，看板默认按「归首日」把会话 credit 归因到它首次出现的那天（详见 DATA-GUIDE.md §2.2 / §8.5），这是估算值。以下两种可选用法都能用**服务端精确值**覆盖对应日期窗口的每日 credit。
@@ -174,7 +166,7 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 #### 用法三：官方用量 API（--billing-token-file，手动加载 token）
 
 > **定位**：用法一（`--credit-xlsx`）的"免导出版"——效果相同，但无需先去用量页导出 xlsx，需要用户手动从浏览器复制一份鉴权头。
->
+> 
 > **安全总原则**：token 由用户**显式提供**，该能力**默认关闭**，仅当用户主动传入 `--billing-token-file` 时才联网一次。
 
 WorkBuddy 的用量数据来自官方计费 API：
@@ -189,13 +181,17 @@ Body: {"startTime":"YYYY-MM-DD 00:00:00","endTime":"YYYY-MM-DD 23:59:59","pageNu
 **用户手动导出步骤（4 步，全程在你自己浏览器里完成）**：
 
 1. 在**你已登录 WorkBuddy** 的浏览器里打开用量页：<https://www.workbuddy.cn/profile/plans-usage>。
+
 2. 按 `F12` 打开开发者工具 → 切到 **Network（网络）** 标签。
+
 3. 在页面上触发一次用量数据加载（刷新页面、或切一下日期范围），在网络列表里找到那条
-
+   
    `get-user-request-usage` 请求 → 右键 → **Copy → Copy request headers（复制请求头）**，或单独复制它的 `Cookie:` / `Authorization:` 那一行完整内容。
-4. 把复制到的内容粘贴进一个**本地纯文本文件**（如 `~/Desktop/workbuddy-auth.txt`）。
 
+4. 把复制到的内容粘贴进一个**本地纯文本文件**（如 `~/Desktop/workbuddy-auth.txt`）。
+   
    文件里可以是：
+   
    - 一整行 `Cookie: sessionId=xxx; xxx=yyy`（最常见）；或
    - 一整行 `Authorization: Bearer xxxx`；或
    - 直接就是 cookie 的值（不带 `Cookie:` 前缀也行，skill 会当作 Cookie 值处理）。
@@ -247,13 +243,14 @@ python3 scripts/usage_extractor.py --out ./report
 ## 6. 已知限制
 
 1. **token 是权威主指标，本地精确；credit 是次要估算指标**：因本地数据限制只能把一个会话的 credit 归因到它首次出现的那天，所以仍是估算。如需要精确到会话级别，可用 `--credit-xlsx` 导入用量记录进行进一步分析。
-2. 首跑耗时：首次全量解析 traces需 10–30 秒。
-3. **可选联网模式（`--billing-token-file`，默认关闭）：**
 
+2. 首跑耗时：首次全量解析 traces需 10–30 秒。
+
+3. **可选联网模式（`--billing-token-file`，默认关闭）：**
 - 仅在用户**主动**传入该参数时才发起一次出站 HTTPS 请求，且只拉取**用户本人**的用量数据（第一方端点 `workbuddy.cn`，与用量页同一数据源）。
   - 凭据**必须由用户手动提供**：token 文件内容是用户从自己浏览器 DevTools 复制的鉴权头。
   - token 文件等同会话凭证：不要提交仓库、限制文件权限，用后可在 workbuddy.cn 退出登录使其失效。
-  -
+  - 
 
 ---
 
