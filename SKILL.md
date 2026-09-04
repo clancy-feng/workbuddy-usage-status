@@ -33,7 +33,7 @@ metadata:
 
 ## 界面预览
 
-![preview](https://raw.githubusercontent.com/clancy-feng/workbuddy-usage-status/refs/heads/main/dashboard-preview-1.png)
+![preview](https://raw.githubusercontent.com/clancy-feng/workbuddy-usage-status/refs/heads/main/assets/dashboard-preview-1.png)
 
 ## 技能简介
 
