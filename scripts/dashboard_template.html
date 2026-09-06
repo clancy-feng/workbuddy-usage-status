@@ -1,29 +1,29 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<html lang="zh-CN" data-page-node-id="GaP0uFJX9Fog3cagE2fYXV">
+<head data-page-node-id="cH01hvZMB3hq1OeBYntQRc">
+<meta charset="UTF-8" data-page-node-id="uh7S5G2MLok2kjQ6Q6RjI1" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="ZG3EVOPAq7G5TW9HwmdUAo" />
 <title>Workbuddy使用数据看板</title>
 <!--CHART_JS-->
 <style>
   :root{
-    /* 深色基准（默认） */
+    
     --bg:#15171c; --panel:#1e2129; --panel2:#262a34; --border:#333845;
     --text:#e6e9ef; --muted:#9aa3b2; --red:#ff5c5c;
     --green:#3ecf8e; --yellow:#ffcc66; --purple:#b58cff;
-    /* 主题强调色（皮肤可覆盖）；accent-rgb 供图表 rgba 背景使用 */
+    
     --accent:#4f9dff; --accent-rgb:79,157,255;
-    /* 图表语义色（随主题切换，保证浅色模式可见） */
+    
     --c-grid:#2a2f3a; --c-axis:#9aa3b2;
   }
-  /* 浅色主题 */
+  
   [data-theme="light"]{
     --bg:#f5f6f8; --panel:#ffffff; --panel2:#eef0f3; --border:#d8dce3;
     --text:#1a1d23; --muted:#5b6472; --red:#e0392f;
     --green:#1f9d63; --yellow:#c79100; --purple:#7c4dff;
     --c-grid:#e2e6ec; --c-axis:#5b6472;
   }
-  /* 自动模式：跟随系统；当系统为浅色且用户未强制深色时套用浅色变量 */
+  
   @media (prefers-color-scheme: light){
     :root:not([data-theme="dark"]){
       --bg:#f5f6f8; --panel:#ffffff; --panel2:#eef0f3; --border:#d8dce3;
@@ -32,7 +32,7 @@
       --c-grid:#e2e6ec; --c-axis:#5b6472;
     }
   }
-  /* 皮肤预设：仅覆盖强调色（按钮、Token 折线、散点），不改变数据语义色 */
+  
   [data-skin="azure"]{ --accent:#4f9dff; --accent-rgb:79,157,255; }
   [data-skin="emerald"]{ --accent:#22b573; --accent-rgb:34,181,115; }
   [data-skin="sunset"]{ --accent:#ff8a3d; --accent-rgb:255,138,61; }
@@ -99,89 +99,89 @@
   @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}
 </style>
 </head>
-<body>
-<header>
-  <h1 data-i18n="title">Workbuddy使用数据看板</h1>
-  <div class="sub" id="sub">正在加载…（若长时间停留在此，请用浏览器打开本文件并确认已启用 JavaScript）</div>
-  <noscript><div class="sub err">本看板需要 JavaScript 才能渲染。请用浏览器直接打开此文件（双击 / file:// 协议）并允许运行脚本；应用内预览面板可能因沙箱限制不执行脚本。</div></noscript>
-  <div class="head-controls">
-    <select class="ctrl-btn" id="themeSelect" title="切换主题：自动=跟随系统明暗">
-      <option value="auto">自动（跟随系统）</option>
-      <option value="light">浅色</option>
-      <option value="dark">深色</option>
+<body data-page-node-id="r4o5Q4Fy5qSrY1TdZPK9Zq">
+<header data-page-node-id="oZwWEXquuQzGKSxx9esDId">
+  <h1 data-i18n="title" data-page-node-id="wTeybzq4Mw7Ol3CVXWAyyL">Workbuddy使用数据看板</h1>
+  <div class="sub" id="sub" data-page-node-id="cczqcexfsHJPC6WAuyUZ2Z">正在加载…（若长时间停留在此，请用浏览器打开本文件并确认已启用 JavaScript）</div>
+  <noscript data-page-node-id="vhrfAyIrBEnkCjwNoiKVKV"><div class="sub err" data-page-node-id="B1Lmrw4pi7MZvqpWHlpkB2">本看板需要 JavaScript 才能渲染。请用浏览器直接打开此文件（双击 / file:// 协议）并允许运行脚本；应用内预览面板可能因沙箱限制不执行脚本。</div></noscript>
+  <div class="head-controls" data-page-node-id="vhsU5iMESCSaQ0LN1FWODr">
+    <select class="ctrl-btn" id="themeSelect" title="切换主题：自动=跟随系统明暗" data-page-node-id="cOwXVzAn4qMvgCzM5XvTXr">
+      <option value="auto" data-page-node-id="BhCg7ByAUS9KqZZF1HCAZc">自动（跟随系统）</option>
+      <option value="light" data-page-node-id="qftn0NMQgAS3qPjijONEM7">浅色</option>
+      <option value="dark" data-page-node-id="6IvOEjcUQ5MuAH9XwmwXFt">深色</option>
     </select>
-    <select class="ctrl-btn" id="skinSelect" title="切换皮肤">
-      <option value="azure">经典蓝</option>
-      <option value="emerald">墨绿</option>
-      <option value="sunset">暖橙</option>
-      <option value="violet">梦幻紫</option>
-      <option value="rose">蔷薇粉</option>
+    <select class="ctrl-btn" id="skinSelect" title="切换皮肤" data-page-node-id="hsDN0sgrPTBbXK64vjnl6T">
+      <option value="azure" data-page-node-id="aj9TGL25GhjH7vLx0tGeJm">经典蓝</option>
+      <option value="emerald" data-page-node-id="wDllW9DsRZzLyjvm9hYpNQ">墨绿</option>
+      <option value="sunset" data-page-node-id="vRGx0vNY9Vgt6UVM4hPExP">暖橙</option>
+      <option value="violet" data-page-node-id="Df0FAsVcPbDI0c6BYDvYNY">梦幻紫</option>
+      <option value="rose" data-page-node-id="PO5ttwHuJF1YQLU6z26N4D">蔷薇粉</option>
     </select>
-    <button class="lang-toggle" id="langToggle">EN</button>
+    <button class="lang-toggle" id="langToggle" data-page-node-id="Koi8Un2TcTKihTzHGzdDfO">EN</button>
   </div>
 </header>
-<div id="dataWarn" style="display:none;margin:12px 16px;padding:10px 14px;border:1px solid #e0a800;border-radius:8px;background:#fff8e1;color:#7a5b00;font-size:13px;line-height:1.6"></div>
-<div class="wrap" id="app" style="display:none">
-  <div class="filter-bar">
-    <label data-i18n="start">起始日期 <input type="date" id="startDate"></label>
-    <label data-i18n="end">结束日期 <input type="date" id="endDate"></label>
-    <span id="dateErr" style="display:none;color:#e5484d;font-size:12px;align-self:center;"></span>
-    <span class="xlsx-upload">
-      <label class="xlsx-btn" for="xlsxFile" data-i18n="xlsxUploadLabel">上传用量导出 xlsx</label>
-      <input type="file" id="xlsxFile" accept=".xlsx" hidden>
-      <span class="xlsx-status" id="xlsxStatus"></span>
+<div id="dataWarn" style="display:none;margin:12px 16px;padding:10px 14px;border:1px solid #e0a800;border-radius:8px;background:#fff8e1;color:#7a5b00;font-size:13px;line-height:1.6" data-page-node-id="xL0Tk8WqYMbMs8lK0FqVWi"></div>
+<div class="wrap" id="app" style="display:none" data-page-node-id="U7vyqLch6fNWgq51C8lFNw">
+  <div class="filter-bar" data-page-node-id="0w4BREgep2uwjMIHEVaRR9">
+    <label data-i18n="start" data-page-node-id="wpMHnS86w8SYloYk6bEkMs">起始日期 <input type="date" id="startDate" data-page-node-id="0xG0usREFfbCWmpfoLir6I"></label>
+    <label data-i18n="end" data-page-node-id="Qa32Ke6EWr9BgGHwj8LhlD">结束日期 <input type="date" id="endDate" data-page-node-id="tN5eD9xLuW5EQNFzWL8NLU"></label>
+    <span id="dateErr" style="display:none;color:#e5484d;font-size:12px;align-self:center;" data-page-node-id="YLkmWp07zGOCMQstQqNWaC"></span>
+    <span class="xlsx-upload" data-page-node-id="4c5tJZjbIzcvBaqFS9wIqk">
+      <label class="xlsx-btn" for="xlsxFile" data-i18n="xlsxUploadLabel" data-page-node-id="CeJtRkNJVjPFAXcla79fuP">上传用量导出 xlsx</label>
+      <input type="file" id="xlsxFile" accept=".xlsx" hidden data-page-node-id="1UHWWhjo6MneMl8II9FiKv">
+      <span class="xlsx-status" id="xlsxStatus" data-page-node-id="qQIZyZJGMxqdaly6wLgYHu"></span>
     </span>
   </div>
 
-  <div class="kpis" id="kpis"></div>
+  <div class="kpis" id="kpis" data-page-node-id="6HAMfAJy79IybY2E7kgMWL"></div>
 
-  <div class="grid">
-    <div class="card"><h3 data-i18n="cardDailyToken">每日 Token 消耗</h3><div class="hint" data-i18n="hintDailyToken">按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。</div><canvas id="cDailyToken"></canvas></div>
-    <div class="card"><h3 data-i18n="cardDailyThink">每日思考用时（小时）</h3><canvas id="cDailyThink"></canvas></div>
-    <div class="card"><h3 data-i18n="cardDailyCredit">每日积分消耗（credit）<span class="est-badge local" id="creditBadge"></span></h3><div class="hint" data-i18n="hintDailyCredit">本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。</div><canvas id="cDailyCredit"></canvas></div>
-    <div class="card"><h3 data-i18n="cardModelShare">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare"></canvas></div>
-    <div class="card"><h3 data-i18n="cardModelEff">主要模型思考效率</h3><div class="hint" data-i18n="hintModelEff">输出 token / 思考秒数；仅统计样本数 ≥ 10 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff"></canvas></div>
-    <div class="card"><h3 data-i18n="cardScatter">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter">每个点=一次请求；左上方=高产出低耗时=高效率</div><canvas id="cScatter"></canvas></div>
-    <div class="card full"><h3 data-i18n="cardTopSessions">Top 10 会话</h3><div class="hint" data-i18n="hintTopSessions">会话标题 + 模型 + 思考用时 + credit 消耗</div>
-      <div class="tbl-scroll"><table id="tSessions"><thead><tr>
-        <th data-i18n="thSession">会话标题</th><th data-i18n="thModel">模型</th><th class="num" data-i18n="thReq">请求数</th><th class="num" data-i18n="thToken">Token</th>
-        <th class="num" data-i18n="thThink">思考(分)</th><th class="num" data-i18n="thCredit">Credit</th><th class="num" data-i18n="thErr">错误</th><th data-i18n="thStatus">状态</th>
-      </tr></thead><tbody></tbody></table></div>
+  <div class="grid" data-page-node-id="K4cxSS9Gtv68o8Q6Q4z87B">
+    <div class="card" data-page-node-id="ZsKexyHPbVK58PPUvO3cAa"><h3 data-i18n="cardDailyToken" data-page-node-id="PxAxNV5JPBscKzBhu2Koze">每日 Token 消耗</h3><div class="hint" data-i18n="hintDailyToken" data-page-node-id="CHiQMEEguPqejS3AnKmf5y">按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。</div><canvas id="cDailyToken" data-page-node-id="3tWXhW8RFsVUGT6FpIbwQA"></canvas></div>
+    <div class="card" data-page-node-id="cEntnmcMEDCbCS1n2fpb9C"><h3 data-i18n="cardDailyThink" data-page-node-id="7BQJZneucc6KJXSxGCifbR">每日思考用时（小时）</h3><canvas id="cDailyThink" data-page-node-id="06jp5DbmxKo4QJwdvewypw"></canvas></div>
+    <div class="card" data-page-node-id="eVq6BaCQud0h5WOdhwxhBu"><h3 data-i18n="cardDailyCredit" data-page-node-id="jt6dsEiyEOWbExDn0OiyrJ">每日积分消耗（credit）<span class="est-badge local" id="creditBadge" data-page-node-id="fnaHx4DKZPm5bFFKJHgktm"></span></h3><div class="hint" data-i18n="hintDailyCredit" data-page-node-id="rn2rP8C2kqBgDYbFzqks1S">本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。</div><canvas id="cDailyCredit" data-page-node-id="OPTvLPCAEklZjhIbxBHdwm"></canvas></div>
+    <div class="card" data-page-node-id="c9NcINzo50q55so3JBI4uo"><h3 data-i18n="cardModelShare" data-page-node-id="GnSYG6dI9jzkwtULCIsMdf">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare" data-page-node-id="CnGC9LDjkSJzOxmJoGV5A1">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare" data-page-node-id="lQfjH5KGw1NHG3pj1D0fx5"></canvas></div>
+    <div class="card" data-page-node-id="cRFfOJGmWgo29kEfKFalsN"><h3 data-i18n="cardModelEff" data-page-node-id="0Pwl2loa99fEKzHckr4m6y">主要模型思考效率</h3><div class="hint" data-i18n="hintModelEff" data-page-node-id="Z1GBA5J9czNj4CCEhEqqVI">输出 token / 思考秒数；仅统计样本数 ≥ 10 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff" data-page-node-id="zBvv6Hz6uBoLLn7eE4eXis"></canvas></div>
+    <div class="card" data-page-node-id="9mSW2giYHUWmgNLBI3GYLB"><h3 data-i18n="cardScatter" data-page-node-id="vOOt2oaraH3vI06ppCjMZW">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter" data-page-node-id="42hAAhmEE9pOBEzRzH1pPT">每个点=一次请求；左上方=高产出低耗时=高效率</div><canvas id="cScatter" data-page-node-id="dXJvZVoqKkeE0TazTtpDrL"></canvas></div>
+    <div class="card full" data-page-node-id="GYa9pMPmi52tJQHTYuIhLq"><h3 data-i18n="cardTopSessions" data-page-node-id="rDWJIuJRW5nhYWBvflK8Uv">Top 10 会话</h3><div class="hint" data-i18n="hintTopSessions" data-page-node-id="SgGwTQOK4mQnsrNLTUCY5C">会话标题 + 模型 + 思考用时 + credit 消耗</div>
+      <div class="tbl-scroll" data-page-node-id="WmOGZZRaNMMuu0nJhd0WUx"><table id="tSessions" data-page-node-id="HhRBFtx2pMugabO7d5wAPC"><thead data-page-node-id="nYvztovckmbAooBQUCBDU9"><tr data-page-node-id="34go4Dsor32mEHes0PfljC">
+        <th data-i18n="thSession" data-page-node-id="btA24cy0mPM3wfMuUULiMj">会话标题</th><th data-i18n="thModel" data-page-node-id="BhOqnMRKghNMOG8bCwdxC6">模型</th><th class="num" data-i18n="thReq" data-page-node-id="05AGIgcl5FvHMPlmlJWhxE">请求数</th><th class="num" data-i18n="thToken" data-page-node-id="kPOIPCerw20jEUADOSZ67S">Token</th>
+        <th class="num" data-i18n="thThink" data-page-node-id="jS36FgiNfSLwlysSbUWJS3">思考(分)</th><th class="num" data-i18n="thCredit" data-page-node-id="8N0HFF9SPYiIGsktMuDgzp">Credit</th><th class="num" data-i18n="thErr" data-page-node-id="IaVskGOQZ5sXQAIdNwITih">错误</th><th data-i18n="thStatus" data-page-node-id="770khjS86LKkMPxbGvaKAP">状态</th>
+      </tr></thead><tbody data-page-node-id="DYHX6YGNWfhTsHoJZkkQRu"></tbody></table></div>
     </div>
-    <div class="card full" id="spikeCard">
-      <h3 data-i18n="cardSpike">用量高峰探查</h3>
-      <div class="hint" data-i18n="hintSpike">按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。</div>
-      <div id="spikeDays"></div>
+    <div class="card full" id="spikeCard" data-page-node-id="K8BDzvOJUikeZDABYUygzi">
+      <h3 data-i18n="cardSpike" data-page-node-id="VnpREsWtwKkU6MN2MQugAV">用量高峰探查</h3>
+      <div class="hint" data-i18n="hintSpike" data-page-node-id="nUnovTmLKDkviZ8pKPeveQ">按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。</div>
+      <div id="spikeDays" data-page-node-id="my6YSVKyFonO5HGgSzNe0i"></div>
     </div>
-    <div class="card full"><h3 data-i18n="cardCost">模型性价比排行（credit / 10万 token）</h3><div class="hint" data-i18n="hintCost">按模型聚合 credit 与 token；数值越低性价比越高。</div>
-      <div class="note" id="modelCostNote"></div>
-      <div class="tbl-scroll"><table id="tModelCost"><thead><tr>
-        <th data-i18n="thModel2">模型</th><th class="num" id="thCostCount" data-i18n="thSessions">会话数</th><th class="num" data-i18n="thTotalToken">总 Token</th>
-        <th class="num" data-i18n="thTotalCredit">总 Credit</th><th class="num" data-i18n="thCostPer100k">Credit / 1k token</th>
-      </tr></thead><tbody></tbody></table></div>
-      <div class="note" id="modelTips"></div>
+    <div class="card full" data-page-node-id="7tJefT3HtE9eB5LDP77e6k"><h3 data-i18n="cardCost" data-page-node-id="t1m0mEag3q44VqJwwW11TO">模型性价比排行（credit / 10万 token）</h3><div class="hint" data-i18n="hintCost" data-page-node-id="LTXWv5CoSIOtRN8rs6Y3C4">按模型聚合 credit 与 token；数值越低性价比越高。</div>
+      <div class="note" id="modelCostNote" data-page-node-id="BuiGELqR6XyGXOFMoe5TMU"></div>
+      <div class="tbl-scroll" data-page-node-id="xCkGlBaQx47hvCt5oBRLTR"><table id="tModelCost" data-page-node-id="UmYGcWmldtiLZ1T0fbRH2S"><thead data-page-node-id="uu9R5vWx6AlUBvHwTyrw2I"><tr data-page-node-id="Z2H7A2zUQzDV39NGxgxBiU">
+        <th data-i18n="thModel2" data-page-node-id="LHEODHKVIFqC1HEOBJDMI5">模型</th><th class="num" id="thCostCount" data-i18n="thSessions" data-page-node-id="nD8cEVDRnSWPQFGhRwvDxb">会话数</th><th class="num" data-i18n="thTotalToken" data-page-node-id="ZHKp7Nb1NyhcO35LQxSnia">总 Token</th>
+        <th class="num" data-i18n="thTotalCredit" data-page-node-id="LWZOQ2A6rUJkYXQ0bQSwr6">总 Credit</th><th class="num" data-i18n="thCostPer100k" data-page-node-id="BeD2JLg5gYkkYZxNWwVRcj">Credit / 1k token</th>
+      </tr></thead><tbody data-page-node-id="8xPfbwkFdlvy9kRAepJEmH"></tbody></table></div>
+      <div class="note" id="modelTips" data-page-node-id="2lUN6Y5lV8rZeMxe3kt0o2"></div>
     </div>
-    <div class="card full"><h3 data-i18n="cardErrors">每日错误数</h3><div class="hint" data-i18n="hintErrors">span 级 status=error 的计数</div><canvas id="cErrors"></canvas></div>
-    <div class="card full" id="errDetailCard">
-      <h3>错误明细 <span class="est-badge local">全量</span>
-        <button class="ctrl-btn" id="btnErrCsv" type="button" style="float:right;margin-top:-3px;">导出 CSV</button>
+    <div class="card full" data-page-node-id="jLCbPs3ktzLpq7fg79hFtu"><h3 data-i18n="cardErrors" data-page-node-id="R9MlfLX0YD5xzUsa9z18hn">每日错误数</h3><div class="hint" data-i18n="hintErrors" data-page-node-id="iqcLJZo6fFlxGfJgArwQcq">span 级 status=error 的计数</div><canvas id="cErrors" data-page-node-id="aJjBvlO8YV4DFcux6YhW1j"></canvas></div>
+    <div class="card full" id="errDetailCard" data-page-node-id="BEk0gSV2nGuG4OAL43fkmi">
+      <h3 data-page-node-id="KGbCwctiNulh9xKG6HK8PT">错误明细 <span class="est-badge local" data-page-node-id="PNrJepfn8Rr0GR79j937sn">全量</span>
+        <button class="ctrl-btn" id="btnErrCsv" type="button" style="float:right;margin-top:-3px;" data-page-node-id="0xpheJ5CyuxepkRQsB5ro8">导出 CSV</button>
       </h3>
-      <div id="errDetail"></div>
+      <div id="errDetail" data-page-node-id="XDtXJKexqH7rpExNAWLrL2"></div>
     </div>
   </div>
 
-  <div class="note" id="note"></div>
+  <div class="note" id="note" data-page-node-id="MSgOBEHyp90yhB8BxZwtTP"></div>
 </div>
 
 <!--USAGE_DATA-->
 <script>
 const T = window.USAGE_STATUS;
 const charts = [];
-// 效率排名最小样本数：过滤样本数 < 10 的模型，避免小样本比值受单点噪声主导而虚高排名。
-// 放到顶部常量区，确保在 init()->render()->groupEffByModel() 首次调用前已完成初始化（const 有暂时性死区）。
+
+
 const MIN_EFF_SAMPLES = 10;
-// 时间轴自适应粒度阈值：根据筛选范围跨度自动选择桶粒度，避免大跨度下横坐标过密。
-// 跨度 ≤ 120 天 → 按日；120 天 < 跨度 ≤ 730 天 → 按周（周一为周起始）；> 730 天 → 按月。
+
+
 const TIME_GRAN_DAY_MAX = 120;
 const TIME_GRAN_WEEK_MAX = 730;
 function detectLang(){
@@ -284,7 +284,7 @@ function applyStaticLang(){
   document.getElementById('langToggle').textContent = t('lang');
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     const k = el.getAttribute('data-i18n');
-    // 含 input 元素的 label 不覆盖其内容，仅标记（此处无此情形，保留通用逻辑）
+    
     el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
     el.prepend(document.createTextNode(t(k)));
   });
@@ -296,7 +296,7 @@ function getCurRange(){
   return [startEl.value, endEl.value];
 }
 
-// 引导调用 init() 已移至主脚本末尾，确保所有顶层 const（含 THEME_ORDER 等）初始化完成后再执行，避免暂时性死区（TDZ）报错。
+
 
 function fmt(n){ return (n||0).toLocaleString('en-US'); }
 function short(n){ if(n>=1e9)return (n/1e9).toFixed(2)+'B'; if(n>=1e6)return (n/1e6).toFixed(2)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'K'; return (Math.round(n*10)/10).toFixed(1); }
@@ -305,8 +305,8 @@ function dateMinMax(){
   const ds = T.by_day.map(d=>d.date).sort();
   return [ds[0]||'', ds[ds.length-1]||''];
 }
-// 默认展示范围：提供 xlsx 时收敛到其日期窗口（credit 精确区间），否则为全量范围。
-// 注意：这仅决定初始/重置时的选中值，筛选器边界仍是全量范围（defaultRange ≤ dateMinMax）。
+
+
 function defaultRange(){
   const s = T.summary || {};
   const wmin = s.billing_date_min || s.credit_xlsx_date_min;
@@ -319,7 +319,7 @@ function defaultRange(){
 function destroyCharts(){ charts.forEach(c=>c.destroy()); charts.length=0; }
 function between(v, lo, hi){ return (!lo||v>=lo) && (!hi||v<=hi); }
 
-// 主题（auto/light/dark）与皮肤（5 套预设）切换；选择持久化到 localStorage，切换时重渲染图表以套用新配色。
+
 const THEME_ORDER=['auto','light','dark'];
 const SKIN_ORDER=['azure','emerald','sunset','violet','rose'];
 function applyThemeSkin(){
@@ -334,8 +334,8 @@ function applyThemeSkin(){
 }
 function rerenderCharts(){ const [s,e]=getCurRange(); render(s,e); }
 
-// ---- 前端内联解析：上传用量导出 xlsx，覆盖每日 credit（与 Python --credit-xlsx 同口径）----
-// 零依赖：仅用浏览器原生 API（FileReader / DecompressionStream / DOMParser），文件不出本机。
+
+
 let sharedStrings = null;
 
 async function inflateRaw(bytes){
@@ -352,7 +352,7 @@ async function inflateRaw(bytes){
 }
 function strFromU8(u){ return new TextDecoder('utf-8').decode(u); }
 
-// 扫描 zip 本地文件头，返回 {name: {method, data:Uint8Array}}（data 为已解压的 XML 字节）
+
 async function readZipEntries(buf){
   const dv = new DataView(buf);
   const entries = {};
@@ -370,7 +370,7 @@ async function readZipEntries(buf){
       dataStart = off + 30 + nameLen + extraLen;
       if (dataStart + compSize > buf.byteLength){ off++; continue; }
       data = new Uint8Array(buf, dataStart, compSize);
-      if (method === 8) data = await inflateRaw(data); // 0=store 直接使用
+      if (method === 8) data = await inflateRaw(data); 
     } catch(e){ off++; continue; }
     entries[name] = { method, data };
     off = dataStart + compSize;
@@ -385,7 +385,7 @@ function xmlText(el){
   return s;
 }
 
-// worksheet xml -> [{colLetter: value}]（与 Python _read_xlsx_rows 同口径）
+
 function parseSheetXml(xmlStr){
   const doc = new DOMParser().parseFromString(xmlStr, 'application/xml');
   if (doc.querySelector('parsererror')) return null;
@@ -432,8 +432,8 @@ function toDay(tv){
   return null;
 }
 
-// 主入口：读文件 -> { byDay:{day:credit}, byModel:{model:{credit,count}} }
-// byDay 与 Python read_credit_xlsx 同口径；byModel 与 read_credit_xlsx_by_model 同口径（按模型精确 credit + 请求数）
+
+
 async function parseCreditXlsxFile(file){
   const buf = await file.arrayBuffer();
   const entries = await readZipEntries(buf);
@@ -503,7 +503,7 @@ async function handleXlsxUpload(file){
       const days = Object.keys(xmap).sort();
       s.credit_xlsx_date_min = days[0];
       s.credit_xlsx_date_max = days[days.length-1];
-      // 按模型精确表：xlsx 提供每模型 credit + 请求数，借同窗口本地 token 算性价比（与 CLI --credit-xlsx 同口径）
+      
       if (xmodel && Object.keys(xmodel).length){
         const wmin = s.credit_xlsx_date_min, wmax = s.credit_xlsx_date_max;
         const winTokens = {};
@@ -529,8 +529,8 @@ async function handleXlsxUpload(file){
         list.sort((a,b)=>{ const av=(a.credit_per_100k==null)?Infinity:a.credit_per_100k; const bv=(b.credit_per_100k==null)?Infinity:b.credit_per_100k; return av-bv; });
         T.model_cost_official = list;
       }
-      // 适配文件日期区间：把可见范围收敛到 xlsx 窗口（与 CLI --credit-xlsx 在 init 时的 defaultRange 行为一致）；
-      // 用户仍可手动把筛选器拉宽回看全量 token 历史。
+      
+      
       const startEl = document.getElementById('startDate');
       const endEl = document.getElementById('endDate');
       if (startEl && endEl && s.credit_xlsx_date_min && s.credit_xlsx_date_max){
@@ -583,8 +583,8 @@ function clearDateError(){
   if(el){ el.textContent = ''; el.style.display = 'none'; }
 }
 function init(){
-  const [minD, maxD] = dateMinMax();   // 筛选器边界 = 全量数据范围
-  const [dMin, dMax] = defaultRange(); // 默认选中值 = xlsx 窗口（若提供）否则全量
+  const [minD, maxD] = dateMinMax();   
+  const [dMin, dMax] = defaultRange(); 
   const startEl = document.getElementById('startDate');
   const endEl = document.getElementById('endDate');
   startEl.value = dMin; endEl.value = dMax;
@@ -593,7 +593,7 @@ function init(){
   startEl.addEventListener('change',()=>{
     if(startEl.value && endEl.value && startEl.value > endEl.value){
       showDateError('起始日期不能晚于结束日期，请修正。');
-      return;  // 不静默重置、不渲染
+      return;  
     }
     clearDateError();
     render(startEl.value, endEl.value);
@@ -601,7 +601,7 @@ function init(){
   endEl.addEventListener('change',()=>{
     if(startEl.value && endEl.value && endEl.value < startEl.value){
       showDateError('结束日期不能早于起始日期，请修正。');
-      return;  // 不静默重置、不渲染
+      return;  
     }
     clearDateError();
     render(startEl.value, endEl.value);
@@ -633,7 +633,7 @@ function renderWarnings(){
   el.style.display = 'block';
 }
 
-// 时间轴自适应粒度：根据当前筛选范围跨度选择桶（日 / 周 / 月），聚合后作为时序图横坐标。
+
 function granularityForSpan(start, end){
   const s = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
@@ -642,24 +642,24 @@ function granularityForSpan(start, end){
   if (span <= TIME_GRAN_WEEK_MAX) return {gran:'week', span};
   return {gran:'month', span};
 }
-// 周一为起始的 ISO 周起始日期（按本地时区格式化，避免 toISOString 的 UTC 偏移）
+
 function isoWeekStart(dateStr){
   const dt = new Date(dateStr + 'T00:00:00');
-  const dow = (dt.getDay() + 6) % 7; // 0 = 周一
+  const dow = (dt.getDay() + 6) % 7; 
   dt.setDate(dt.getDate() - dow);
   const y = dt.getFullYear();
   const m = String(dt.getMonth() + 1).padStart(2, '0');
   const d = String(dt.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
-// 把日级数据聚合到当前粒度桶（求和：总量 / 总思考秒 / 错误数）
+
 function buildBuckets(dayFilt, gran){
   const map = new Map();
   dayFilt.forEach(d=>{
     let key;
     if (gran === 'day') key = d.date;
     else if (gran === 'week') key = isoWeekStart(d.date);
-    else key = d.date.slice(0,7); // YYYY-MM
+    else key = d.date.slice(0,7); 
     if(!map.has(key)) map.set(key, {label:key, tokens:0, credit:0, thinking_sec:0, errors:0});
     const b = map.get(key);
     b.tokens += d.tokens||0;
@@ -673,7 +673,7 @@ function buildBuckets(dayFilt, gran){
 function render(start, end){
   if (start && end && start > end){
     showDateError('起始日期不能晚于结束日期，请修正。');
-    return;  // 无效范围：保留上一次有效渲染，不画垃圾图
+    return;  
   }
   clearDateError();
   const s=T.summary;
@@ -681,7 +681,7 @@ function render(start, end){
   const hasFilter = start && end && (start!==defaultRange()[0] || end!==defaultRange()[1]);
   const inRange = d => between(d, start, end);
 
-  // 时间轴自适应粒度：根据筛选范围跨度选择日/周/月桶（glT/glS 供副标题与标题使用，需先于 sub 行）
+  
   const granInfo = granularityForSpan(start, end);
   const gkey = granInfo.gran;
   const zh = LANG !== 'en';
@@ -692,11 +692,11 @@ function render(start, end){
   const glT = zh ? GP.zhT : GP.enT;
   const glS = zh ? GP.zhS : GP.enS;
 
-  // 按日期筛选后的会话、请求
+  
   const sessFilt = T.by_session.filter(sb => inRange(sb.first_date));
   const reqFilt = (T.requests_slim||[]).filter(r => inRange(r.date));
 
-  // KPI 从筛选后的会话重算
+  
   const kpi = sessFilt.reduce((acc, sb)=>{
     acc.requests += sb.requests||0;
     acc.tokens += sb.tokens||0;
@@ -708,7 +708,7 @@ function render(start, end){
   kpi.sessions = sessFilt.length;
   kpi.thinking_hours = (kpi.thinking_sec/3600).toFixed(2);
   kpi.eff = (kpi.thinking_sec>0) ? (kpi.output/kpi.thinking_sec).toFixed(1) : '0.0';
-  // output 在会话级没有，用筛选请求重算
+  
   kpi.output = reqFilt.reduce((a,r)=>a+(r.output||0),0);
   kpi.eff = (kpi.thinking_sec>0) ? (kpi.output/kpi.thinking_sec).toFixed(1) : '0.0';
 
@@ -734,7 +734,7 @@ function render(start, end){
      ${k.hint?`<div class="kpi-hint ${k.err?'err':''}">${esc(k.hint)}</div>`:''}</div>`).join('');
 
   const dayFilt = T.by_day.filter(d => inRange(d.date));
-  // 时间轴自适应粒度：按筛选范围跨度选择桶（granInfo/glT/glS 已在 render 顶部定义），再聚合。
+  
   const buckets = buildBuckets(dayFilt, granInfo.gran);
   const rs=getComputedStyle(document.documentElement);
   const gridColor=rs.getPropertyValue('--c-grid').trim()||'#2a2f3a';
@@ -746,7 +746,7 @@ function render(start, end){
   Chart.defaults.borderColor=gridColor;
   Chart.defaults.font.family='-apple-system,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif';
 
-  // 时间轴粒度自适应：更新 4 张时序图的标题与提示
+  
   const cardTitle = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('h3'); if(h){ h.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; }); h.prepend(document.createTextNode(zh?zhTxt:enTxt)); } } };
   const cardHint = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('.hint'); if(h) h.textContent = zh?zhTxt:enTxt;} };
   cardTitle('cDailyToken', glT+' Token 消耗', glT+' Token Usage');
@@ -763,13 +763,13 @@ function render(start, end){
 
   destroyCharts();
 
-  // 每日 token（主角指标，本地精确）—— 按当前粒度桶聚合
+  
   charts.push(new Chart(cDailyToken,{type:'line',data:{labels:buckets.map(b=>b.label),
     datasets:[{label:t('dsToken'),data:buckets.map(b=>b.tokens),borderColor:accent,
       backgroundColor:'rgba('+accentRgb+',.15)',fill:true,tension:.3,pointRadius:2}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 每日 credit（估算 / 精确，取决于是否提供 xlsx 或用量 API token）—— 按当前粒度桶聚合
+  
   const creditBadge = document.getElementById('creditBadge');
   if (creditBadge){
     if (cs === 'api_precise'){ creditBadge.textContent = t('badgeApiPrecise'); creditBadge.className = 'est-badge precise'; }
@@ -781,13 +781,13 @@ function render(start, end){
       backgroundColor:'rgba('+accentRgb+',.15)',fill:true,tension:.3,pointRadius:2}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 每日思考用时 —— 按当前粒度桶聚合
+  
   charts.push(new Chart(cDailyThink,{type:'bar',data:{labels:buckets.map(b=>b.label),
     datasets:[{label:t('dsThink'),data:buckets.map(b=>(b.thinking_sec/3600).toFixed(2)),
       backgroundColor:accent}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
-  // 模型占比 Top10 + 其他
+  
   const share = groupTokensByModel(reqFilt);
   const topShare = top10others(share);
   charts.push(new Chart(cModelShare,{type:'doughnut',data:{labels:topShare.labels,
@@ -795,7 +795,7 @@ function render(start, end){
       backgroundColor:['#4f9dff','#3ecf8e','#ffcc66','#b58cff','#ff5c5c','#5ad1c4','#f0934f','#8ab4f8','#7bed9f','#ff9ff3','#57606f']}]},
     options:{plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}}}}));
 
-  // 模型效率 Top10（不含「其他」，避免合并后效率虚高）
+  
   const eff = groupEffByModel(reqFilt);
   const topEff = topN(eff.map(m=>({key:m.model,val:m.efficiency})).filter(x=>x.val>0), 10);
   charts.push(new Chart(cModelEff,{type:'bar',data:{labels:topEff.labels,
@@ -803,7 +803,7 @@ function render(start, end){
       backgroundColor:accent}]},
     options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
-  // 散点
+  
   const pts=T.requests_sample.filter(r=>inRange(r.date)).map(r=>({x:+(r.thinking_sec).toFixed(1),y:r.output,
     m:r.model,t:r.tokens}));
   charts.push(new Chart(cScatter,{type:'scatter',data:{datasets:[{label:t('dsReq'),data:pts,
@@ -813,12 +813,12 @@ function render(start, end){
       scales:{x:{title:{display:true,text:t('xThink')},grid},
         y:{title:{display:true,text:t('yOutput')},grid,ticks:{callback:v=>short(v)}}}}}));
 
-  // 错误 —— 按当前粒度桶聚合
+  
   charts.push(new Chart(cErrors,{type:'bar',data:{labels:buckets.map(b=>b.label),
     datasets:[{label:t('dsErr'),data:buckets.map(b=>b.errors),backgroundColor:'#ff5c5c'}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
-  // Top 会话表
+  
   const tb=document.querySelector('#tSessions tbody');
   tb.innerHTML=sessFilt.slice(0,10).map(x=>`<tr>
     <td>${esc(x.title||'(无标题)')}</td><td><span class="tag">${esc(x.models||'?')}</span></td>
@@ -828,10 +828,10 @@ function render(start, end){
     <td class="num ${x.errors?'err':''}">${x.errors}</td>
     <td>${esc(x.status||'')}</td></tr>`).join('');
 
-  // 模型性价比表
-  // 官方用量导出（服务端逐请求精确 credit）优先；无导出时回退本地会话级归因。
-  // 本地归因把「整会话 credit」全归给 sessions.model，同一会话混用免费/付费模型时
-  // 会把付费 credit 错记到免费模型上（hy3 因此虚高到数千），故有官方数据时以官方为准。
+  
+  
+  
+  
   const offList = T.model_cost_official || [];
   const useOfficial = offList.length > 0;
   let costList = [];
@@ -843,7 +843,7 @@ function render(start, end){
     const wmin = (T.summary && (T.summary.billing_date_min || T.summary.credit_xlsx_date_min)) || '';
     const wmax = (T.summary && (T.summary.billing_date_max || T.summary.credit_xlsx_date_max)) || '';
     costSrcNote = wmin ? (cs==='api_precise' ? `官方精确（用量 API）· 窗口 ${wmin} ~ ${wmax}` : `官方精确（用量导出）· 窗口 ${wmin} ~ ${wmax}`) : (cs==='api_precise' ? '官方精确（用量 API）' : '官方精确（用量导出）');
-    // credit/10万token 为 null 表示本地无该模型 token（如图像模型），排到最后
+    
     costList.sort((a,b)=>{
       const av = (a.credit_per_100k == null) ? Infinity : a.credit_per_100k;
       const bv = (b.credit_per_100k == null) ? Infinity : b.credit_per_100k;
@@ -861,14 +861,14 @@ function render(start, end){
     costList = Object.values(costMap)
       .filter(m => m.model !== 'unknown' && m.tokens > 0)
       .map(m => ({...m, credit_per_100k: m.tokens ? Math.round(m.credit/m.tokens*1e7)/100 : 0}))
-      .filter(m => m.credit_per_100k > 0);  // 本地口径下 0 值行无性价比意义，不展示
+      .filter(m => m.credit_per_100k > 0);  
     costList.sort((a,b)=>a.credit_per_100k - b.credit_per_100k);
   }
 
   const tmc = document.querySelector('#tModelCost tbody');
   const costNoteEl = document.getElementById('modelCostNote');
   if (costNoteEl) costNoteEl.textContent = costSrcNote || '';
-  // 官方口径下该列是「请求数」（xlsx 无 sessionId，无法还原会话数），本地口径才是会话数
+  
   const thCostCount = document.getElementById('thCostCount');
   if (thCostCount) thCostCount.textContent = useOfficial ? t('thReq') : t('thSessions');
   if (costList.length) {
@@ -892,7 +892,7 @@ function render(start, end){
     tmc.innerHTML = `<tr><td colspan="5" class="err">${t('emptyCost')}</td></tr>`;
   }
 
-  // 模型优化建议：按当前筛选后的数据重新生成一句提示
+  
   const mt = document.getElementById('modelTips');
   const substantial = costList.filter(m =>
     !['auto','unknown'].includes(m.model) &&
@@ -920,7 +920,7 @@ function render(start, end){
   renderErrorDetail();
 }
 
-// 错误明细：把原本只计数的错误升级为可下钻的分类统计（基于全量数据，不受日期筛选影响）
+
 function renderErrorDetail(){
   const host = document.getElementById('errDetail');
   if(!host) return;
@@ -948,14 +948,13 @@ function renderErrorDetail(){
   `;
 }
 
-// CSV 单元格转义：含逗号/引号/换行的字段加双引号包裹，内部双引号翻倍
+
 function csvCell(v){
   const s = (v===null||v===undefined) ? '' : (''+v);
   if(/[",\n\r]/.test(s)) return '"'+s.replace(/"/g,'""')+'"';
   return s;
 }
 
-// 错误明细 CSV 导出：把 6 个分类统计合并为一个带分节标题的 CSV（含 BOM，Excel 中文不乱码）
 function exportErrorCsv(){
   const ed = T.error_detail;
   if(!ed || !ed.total){ alert('无错误数据可导出。'); return; }
@@ -1031,7 +1030,6 @@ function renderSpikeDays(){
   }).join('');
 }
 
-// 聚合请求到模型
 function groupTokensByModel(reqs){
   const m={};
   reqs.forEach(r=>{
@@ -1040,8 +1038,6 @@ function groupTokensByModel(reqs){
   });
   return Object.entries(m).map(([model,tokens])=>({model,tokens})).sort((a,b)=>b.tokens-a.tokens);
 }
-// 效率统计的最小样本数：仅用一两次任务的模型，output/thinking 比值受单点噪声主导，
-// 排名不可靠，剔除后再参与「各模型思考效率」排名（常量 MIN_EFF_SAMPLES 已移至脚本顶部常量区）。
 function groupEffByModel(reqs){
   const m={};
   reqs.forEach(r=>{
@@ -1074,7 +1070,6 @@ function topN(arr, n){
   return {labels: top.map(x=>x.key||x.model), data: top.map(x=>x.val||x.tokens)};
 }
 
-// === 引导入口：置于主脚本末尾，确保所有顶层 const（含 THEME_ORDER / THEME_LABEL / SKIN_ORDER）已初始化，避免 TDZ 报错 ===
 if(!T){ document.getElementById('sub').textContent='数据未加载：请重新运行 usage_extractor.py 生成自包含仪表盘。'; }
 else {
   try { init(); }
@@ -1086,8 +1081,8 @@ else {
   }
 }
 </script>
-<p style="text-align:center; color:#888; font-size:12px; margin-top:20px; padding:10px; border-top:1px solid #eee;">
-⭐ 喜欢这个看板？来 GitHub 点个 Star 支持独立开发：<a href="https://github.com/clancy-feng/workbuddy-usage-status" target="_blank" style="color:#0366d6;">github.com/clancy-feng/workbuddy-usage-status</a>
-</p>
+<p style="text-align:center; color:#888; font-size:12px; margin-top:20px; padding:10px; border-top:1px solid #eee;" data-page-node-id="gQhyMUG2xFIvxuCE9BEPef">
+⭐ 喜欢这个看板？来 GitHub 点个 Star 支持独立开发：<a href="https:
+</p data-page-node-id="wTEcH1kbP7nEnHs0SHDJYs">
 </body>
 </html>

@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
+
 """
 WorkBuddy 本地 usage-status 抽取器
+（面向中文 WorkBuddy 用户 zh-CN 设计；英文能力说明见 SKILL.md 的 description EN 段）
 读取 ~/.workbuddy 下的:
   - workbuddy.db  (sessions + session_usage: token预算/上下文上限/credit消耗)
   - traces/*/trace_*.json  (每次请求的时长/token拆分/思考用时/模型/工具调用/错误)
@@ -17,25 +18,25 @@ HOME = os.path.expanduser("~/.workbuddy")
 DB = os.path.join(HOME, "workbuddy.db")
 TRACES = os.path.join(HOME, "traces", "*", "trace_*.json")
 
-# 脚本所在目录(模板与脚本一起搬运, 与 cwd 无关)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 数据完整性计数器：把被静默跳过的记录暴露出来，避免用户误以为报告完整
-skipped_trace_files = []   # (路径, 错误) 损坏或无法解析的 trace 文件
-bad_credit_sessions = 0    # credit_json 解析失败的会话数
 
-# 错误明细聚合：把原本被丢弃的 span.error 字符串内容重新捕获并分类，
-# 用于把"裸错误计数"升级为可下钻的错误分析（按消息/类型/工具/模型/会话）。
-err_msg_counter = Counter()       # 错误信息字符串 -> 次数
-err_type_counter = Counter()       # 出错 span 的 type -> 次数
-err_tool_counter = Counter()       # 出错 span 的 toolName -> 次数
-err_by_model = {}                 # model -> Counter(错误信息)
-day_model_tokens = {}             # (day, model) -> tokens，供官方 xlsx 窗口内精确 credit/10万token
-err_by_session = {}               # session_id -> Counter(错误信息)
-err_by_day = {}                   # date -> Counter(错误信息)
-error_samples = []                # 近期错误样本（≤50 条，供下钻）
+skipped_trace_files = []   
+bad_credit_sessions = 0    
 
-# 输出目录: 默认当前工作目录, 可用 --out 覆盖
+
+
+err_msg_counter = Counter()       
+err_type_counter = Counter()       
+err_tool_counter = Counter()       
+err_by_model = {}                 
+day_model_tokens = {}             
+err_by_session = {}               
+err_by_day = {}                   
+error_samples = []                
+
+
 parser = argparse.ArgumentParser(description="WorkBuddy 本地 usage-status 抽取器")
 parser.add_argument("--out", default=os.getcwd(),
                     help="输出目录 (默认: 当前工作目录)")
@@ -64,7 +65,7 @@ def ms_to_sec(ms):
 
 
 def parse_ts(ts):
-    # 支持 "2026-07-13T03:50:09.584Z" 与整数毫秒
+    
     if isinstance(ts, (int, float)):
         return ts
     try:
@@ -76,7 +77,7 @@ def parse_ts(ts):
 def day_key(ts_ms):
     if not ts_ms:
         return "unknown"
-    # 按本地时区归日（原为 utcfromtimestamp，临近午夜的请求会被算到前一天，已修正）
+    
     return datetime.datetime.fromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d")
 
 
@@ -101,7 +102,7 @@ def _read_xlsx_rows(path):
         return None, None
     names = set(z.namelist())
 
-    # 共享字符串表
+    
     shared = []
     if "xl/sharedStrings.xml" in names:
         try:
@@ -111,7 +112,7 @@ def _read_xlsx_rows(path):
         except Exception:
             pass
 
-    # 取第一个 worksheet
+    
     sheet_path = "xl/worksheets/sheet1.xml"
     if sheet_path not in names:
         cands = [n for n in names if n.startswith("xl/worksheets/sheet")]
@@ -235,10 +236,10 @@ def read_credit_xlsx_by_model(path):
     return by_model, by_model_cnt
 
 
-# ---------- 0.5 可选：用量 API（用户手动导出 token，opt-in） ----------
-# 与 --credit-xlsx 不同，这里直接从官方计费 API 拉取逐请求精确 credit，无需先导出 xlsx。
-# 安全约束：token 必须由用户**显式提供**（从自己浏览器 DevTools 复制后存入本地文件）；
-# skill 绝不自动读取宿主 App 的凭据存储（跨应用凭据获取 = 审计高危）。
+
+
+
+
 BILLING_API_URL = "https://www.workbuddy.cn/billing/meter/get-user-request-usage"
 
 def aggregate_billing_rows(rows):
@@ -276,7 +277,7 @@ def fetch_billing_usage(token_file, start, end):
     raw = open(token_file, encoding="utf-8").read().strip()
     if not raw:
         raise ValueError("token 文件为空")
-    # 解析鉴权头：取首个非空行；若含冒号则拆为 Key/Value，否则整体当作 Cookie 值
+    
     header_key, header_val = "Cookie", raw
     for line in raw.splitlines():
         line = line.strip()
@@ -304,7 +305,7 @@ def fetch_billing_usage(token_file, start, end):
     return aggregate_billing_rows(payload.get("data", {}).get("data", []))
 
 
-# ---------- 1. 读取 DB: session 元信息 + 用量 ----------
+
 print("[1/4] 读取 workbuddy.db ...", flush=True)
 sess_meta = {}
 sess_credit = {}
@@ -341,7 +342,7 @@ except Exception as e:
     print("  DB 读取失败(不影响 traces 部分):", e, flush=True)
 
 
-# ---------- 2. 解析 traces ----------
+
 print("[2/4] 解析 traces (可能较慢) ...", flush=True)
 requests = []
 by_day = {}
@@ -369,7 +370,7 @@ for i, fp in enumerate(files):
     ended = parse_ts(tr.get("endedAt") or tr.get("ended_at"))
     duration_ms = tr.get("duration") or (int(ended - started) if started and ended else 0)
     total_tokens = tr.get("totalTokens") or 0
-    # 仅统计有实际 token 消耗的会话级运行；无 token 的工作流记账（零用量噪声）不计入用量基数
+    
     if total_tokens <= 0:
         continue
     in_tok = mi.get("totalInputTokens") or 0
@@ -381,21 +382,21 @@ for i, fp in enumerate(files):
     session_id = tr.get("sessionId") or ""
     status = tr.get("status") or "ok"
 
-    # 思考用时 = 所有 generation(模型推理) span 的时长之和
+    
     thinking_ms = 0
     tool_ms = 0
     tool_count = 0
     err_count = 0
-    dk = day_key(started)   # 本请求归属日期，供错误按天聚合
-    # 按「日期 × 模型」累计 token：官方 xlsx 只给 credit 不给 token，
-    # 需用它算出导出窗口内各模型的 token，才能得到精确的 credit/10万token。
+    dk = day_key(started)   
+    
+    
     day_model_tokens[(dk, model_name)] = day_model_tokens.get((dk, model_name), 0) + total_tokens
     for s in spans:
         st = s.get("status")
         em = s.get("error")
         if st == "error" or em:
             err_count += 1
-            # 把被丢弃的 error 内容还原为可分类的统计信息
+            
             emsg = em if isinstance(em, str) else (json.dumps(em, ensure_ascii=False) if em else (st or "error"))
             if len(emsg) > 300:
                 emsg = emsg[:300]
@@ -440,7 +441,7 @@ for i, fp in enumerate(files):
     }
     requests.append(rec)
 
-    # 错误样本（每请求取首条错误，封顶 50 条供下钻）
+    
     if err_count and len(error_samples) < 50:
         err_examples = [s for s in spans if s.get("status") == "error" or s.get("error")]
         if err_examples:
@@ -458,7 +459,7 @@ for i, fp in enumerate(files):
                 "msg": e0msg,
             })
 
-    # 日聚合
+    
     dk = rec["date"]
     b = by_day.setdefault(
         dk,
@@ -474,12 +475,12 @@ for i, fp in enumerate(files):
     b["errors"] += err_count
     if session_id:
         b["sessions"].add(session_id)
-        # 记录该会话首次出现日期, 用于后续 credit 单次归因(避免按请求重复累加)
+        
         if session_id not in sess_min or (started and started < sess_min[session_id]):
             sess_min[session_id] = started
             sess_first[session_id] = dk
 
-    # 模型聚合
+    
     mb = by_model.setdefault(
         model_name,
         {"model": model_name, "requests": 0, "tokens": 0, "input": 0,
@@ -493,7 +494,7 @@ for i, fp in enumerate(files):
     mb["thinking_sec"] += thinking_sec
     mb["errors"] += err_count
 
-    # 会话聚合
+    
     sb = by_session.setdefault(
         session_id,
         {"session_id": session_id, "requests": 0, "tokens": 0, "thinking_sec": 0.0,
@@ -506,7 +507,7 @@ for i, fp in enumerate(files):
     sb["models"].add(model_name)
 
 
-# ---------- 3. 收尾聚合 ----------
+
 print("[3/4] 聚合指标 ...", flush=True)
 days = sorted(by_day.keys())
 day_list = []
@@ -517,9 +518,9 @@ for dk in days:
     b["credit"] = round(b["credit"], 2)
     day_list.append(b)
 
-# ---- 3.5 可选：用用量导出 xlsx 的精确 credit 覆盖对应日期窗口 ----
-# 注意：覆盖必须放在「会话级 credit 按 token 占比分摊」(sess_list 循环) 之后，
-# 否则分摊逻辑会再次把本地 credit 累加到被覆盖的日期上，造成重复累加。
+
+
+
 credit_source = "local_estimate"
 credit_note = ("本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不编造到后续免费/无消费日）；"
                "趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。")
@@ -540,14 +541,14 @@ for sb in by_session.values():
     sb["models"] = ",".join(sorted(sb["models"]))
     sb["model"] = meta.get("model", "") or "unknown"
     sb["thinking_sec"] = round(sb["thinking_sec"], 1)
-    # credit 每个会话只计一次(来自 session_usage 的会话级汇总)
+    
     cr = sess_credit.get(sb["session_id"], {}).get("credit", 0)
     sb["credit"] = round(cr, 2)
-    # 本地无逐日 credit 时间戳，无法精确拆分到天。
-    # 默认把整个会话的 credit 归因到它「首次出现」的那一天(归首日)：
-    # 这是本地能做的「最不坏」方案——credit 绑在会话起点，不会把 credit 编造到
-    # 后续免费/无消费的日子里(例如用免费 HY3 续跑的旧会话)。
-    # 精确每日 credit 只能由 --credit-xlsx 覆盖给出。
+    
+    
+    
+    
+    
     sid = sb["session_id"]
     fd = sess_first.get(sid)
     sb["first_date"] = fd or ""
@@ -556,13 +557,13 @@ for sb in by_session.values():
     sess_list.append(sb)
 sess_list.sort(key=lambda x: x["tokens"], reverse=True)
 
-# ---- 3.5 可选：用用量导出 xlsx 的精确 credit 覆盖对应日期窗口 ----
-# 必须放在 sess_list 循环之后（见上方说明），避免分摊逻辑重复累加本地 credit。
-# xlsx_date_min/max：xlsx 实际覆盖的日期窗口，供前端把默认展示范围收敛到该窗口
-# （不锁死筛选器，用户仍可拉回看全量 token 历史）。
+
+
+
+
 xlsx_date_min = None
 xlsx_date_max = None
-model_cost_official = []   # 官方 xlsx 逐模型精确 credit（服务端口径）；为空表示未提供导出
+model_cost_official = []   
 if args.credit_xlsx:
     print("[3.5] 读取用量导出 xlsx (--credit-xlsx) ...", flush=True)
     xmap = read_credit_xlsx(args.credit_xlsx)
@@ -582,13 +583,13 @@ if args.credit_xlsx:
         xlsx_date_min = xlsx_dates[0]
         xlsx_date_max = xlsx_dates[-1]
 
-        # ---- 按模型汇总官方精确 credit（服务端逐请求口径）----
-        # 本地「模型性价比」是会话级归因：整会话 credit 全归给 sessions.model。
-        # 同一会话混用免费/付费模型时，付费 credit 会被错记到免费模型上（如 hy3 虚高）。
-        # 官方导出是逐请求的真实 credit，用它修正后免费模型才会如实显示为 0 并被标为限免。
+        
+        
+        
+        
         xmodel, xmodel_cnt = read_credit_xlsx_by_model(args.credit_xlsx)
         if xmodel:
-            # xlsx 不含 token，取本地 traces 同窗口内的 token 来配平 credit/10万token
+            
             win_tokens = {}
             for (d, m), tk in day_model_tokens.items():
                 if xlsx_date_min <= d <= xlsx_date_max:
@@ -601,7 +602,7 @@ if args.credit_xlsx:
                     "tokens": tk,
                     "credit": round(cr, 2),
                     "credit_per_100k": (round(cr / tk * 100000.0, 2) if tk else None),
-                    # 官方精确口径下的「限免」判定：credit 为 0 且用量不小
+                    
                     "zero_credit": (cr <= 0.0 and tk >= 1_000_000),
                 })
             print(f"  xlsx 按模型汇总 {len(xmodel)} 个模型（服务端精确 credit）。", flush=True)
@@ -612,16 +613,17 @@ if args.credit_xlsx:
     else:
         print("  xlsx 读取失败或未识别到必要列，credit 维持本地估算。", flush=True)
 
-# ---- 3.6 可选：用量 API（用户手动导出 token，opt-in，优先于 xlsx）----
-# 与 3.5 同口径：覆盖每日 credit + 按模型精确 credit。绝不自动读取宿主 App 凭据。
+
+
 billing_date_min = None
 billing_date_max = None
 if args.billing_token_file:
     print("[3.6] 用量 API（--billing-token-file，用户手动提供 token）...", flush=True)
     try:
-        api_start = (summary.get("date_min")
-                     or (datetime.date.today() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
-        api_end = summary.get("date_max") or datetime.date.today().strftime("%Y-%m-%d")
+        _data_dates = [r["date"] for r in requests if r["date"] != "unknown"]
+        api_start = (min(_data_dates) if _data_dates
+                     else (datetime.date.today() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
+        api_end = max(_data_dates) if _data_dates else datetime.date.today().strftime("%Y-%m-%d")
         day_map, by_model, by_model_cnt, bmin, bmax = fetch_billing_usage(
             args.billing_token_file, api_start, api_end)
         if day_map:
@@ -636,7 +638,7 @@ if args.billing_token_file:
                                f"（窗口内为服务端精确值，由用户手动提供的 token 拉取）；"
                                f"未覆盖日期仍为本地估算。")
             billing_date_min, billing_date_max = bmin, bmax
-            # 按模型汇总官方精确 credit（逐请求口径，修正本地归因虚高）
+            
             if by_model:
                 win_tokens = {}
                 for (d, m), tk in day_model_tokens.items():
@@ -660,7 +662,7 @@ if args.billing_token_file:
     except Exception as e:
         print("  用量 API 拉取失败，credit 维持本地估算：", e, flush=True)
 
-# ---------- 2.6 模型性价比 (会话级 model 聚合, 关联 sessions.model) ----------
+
 print("[2.6] 模型性价比 ...", flush=True)
 model_cost = {}
 for sb in sess_list:
@@ -678,12 +680,12 @@ for mc in model_cost.values():
         continue
     c1k = (mc["credit"] / mc["tokens"] * 100000.0) if mc["tokens"] else 0.0
     mc["credit_per_100k"] = round(c1k, 2)
-    # 标记限时免费/促销模型：credit 为 0 但 token 不少（可能 WorkBuddy 内部倍率为 0）
+    
     mc["zero_credit"] = (mc["credit"] <= 0.0 and mc["tokens"] >= 1_000_000)
     model_cost_list.append(mc)
 model_cost_list.sort(key=lambda x: x["credit_per_100k"])
 
-# 优化建议: 在可比任务量(≥1000万token)的通用模型间, 比较最便宜与最贵
+
 model_tips = []
 substantial = [
     m for m in model_cost_list
@@ -691,7 +693,7 @@ substantial = [
     and "preview" not in m["model"]
     and "agent" not in m["model"]
     and m["tokens"] >= 10_000_000
-    and m["credit"] > 0.0          # 排除限时免费/促销模型，避免把“当前零成本”当成长期基准
+    and m["credit"] > 0.0          
 ]
 if len(substantial) >= 2:
     cheapest = min(substantial, key=lambda x: x["credit_per_100k"])
@@ -704,38 +706,38 @@ if len(substantial) >= 2:
                 f"(credit/10万token={cheapest['credit_per_100k']}) 相比「{priciest['model']}」"
                 f"(credit/10万token={priciest['credit_per_100k']}) 预计节省约 {save:.0f}% 的 credit；"
                 f"前提是两个模型处理的工作负载可互相迁移。")
-# 单独提示零 credit 模型
+
 for m in model_cost_list:
     if m["zero_credit"] and m["tokens"] >= 10_000_000:
         model_tips.append(
             f"「{m['model']}」当前 credit/10万token=0（消耗 credit {m['credit']:.2f}），"
             f"可能处于限免/促销期；不建议把它作为长期成本基准。")
 
-# ---------- 2.7 用量高峰探查 (非异常判定, 仅定位高用量日并拆解成因) ----------
-# 用户原话: 不需要"正常/异常"二分, 但要能自动找出几个明显高的使用日,
-# 并像案例分析那样拆解"那天发生了什么"(主导会话/模型构成/错误率/最大单请求)。
-# 精确到天(而非模糊窗口), 因为图里看不出哪天用得最多。
+
+
+
+
 print("[2.7] 用量高峰探查 ...", flush=True)
 daily_credit = {b["date"]: b["credit"] for b in day_list if b["date"] != "unknown"}
-# 排序改为按当天 token 总量（请求级精确到天）；credit 归首日估算不精确，不作排序依据。
+
 daily_tokens = {}
 for r in requests:
     if r["date"] != "unknown":
         daily_tokens[r["date"]] = daily_tokens.get(r["date"], 0) + r["tokens"]
 tok_vals = sorted(daily_tokens.values())
 median_tok = tok_vals[len(tok_vals) // 2] if tok_vals else 0
-thr = max(median_tok * 2.0, 5_000_000)     # 高于中位数 2 倍才算"明显高"，兜底 500 万 token
+thr = max(median_tok * 2.0, 5_000_000)     
 cand = sorted([(d, v) for d, v in daily_tokens.items() if v >= thr],
               key=lambda x: x[1], reverse=True)
 top_days = [d for d, _ in cand[:6]]
-if len(top_days) < 3:                      # 兜底: 样本不足时也至少给 top3
+if len(top_days) < 3:                      
     top_days = [d for d, _ in sorted(daily_tokens.items(), key=lambda x: x[1], reverse=True)[:3]]
 
 spike_days = []
 for d in top_days:
     day_reqs = [r for r in requests if r["date"] == d]
-    # 当天有请求的全部会话（不再限首日）：model=当天实际请求模型（按 token 取主要），token=当天请求 token 之和。
-    # 会话表的 token 口径与「模型 token 构成」一致（都是当天全部请求），左右可对账。
+    
+    
     sess_tok = {}
     sess_mdl = {}
     for r in day_reqs:
@@ -753,7 +755,7 @@ for d in top_days:
         day_sess.append({
             "session_id": sid[:12],
             "title": (meta.get("title", "") or "")[:40],
-            "model": model_str,           # 当天实际请求的全部模型（按 token 降序），与右侧构成对齐
+            "model": model_str,           
             "tokens": tok,
         })
     day_sess.sort(key=lambda x: x["tokens"], reverse=True)
@@ -771,7 +773,7 @@ for d in top_days:
     spike_days.append({
         "date": d,
         "tokens": sum(r["tokens"] for r in day_reqs),
-        "credit": round(daily_credit.get(d, 0.0), 2),   # 归首日估算，仅作参考
+        "credit": round(daily_credit.get(d, 0.0), 2),   
         "requests": n,
         "sessions": len(sess_tok),
         "errors": errs,
@@ -794,9 +796,9 @@ total_credit = round(sum(b["credit"] for b in day_list), 2)
 total_errors = sum(r["errors"] for r in requests)
 dates = [r["date"] for r in requests if r["date"] != "unknown"]
 
-# ---------- 2.8 错误明细聚合 ----------
-# 把全局错误计数器汇总为可下钻的结构：高频消息、按类型、按工具、按模型、按会话、样本。
-# 数据量受 Counter 与 ≤50 样本约束，体积可控。
+
+
+
 error_top_messages = [{"msg": m, "count": c} for m, c in err_msg_counter.most_common(10)]
 error_by_type = [{"type": t, "count": c} for t, c in err_type_counter.most_common()]
 error_by_tool = [{"tool": t, "count": c} for t, c in err_tool_counter.most_common(10)]
@@ -821,7 +823,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.3.0",
+    "version": "1.3.1",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -848,14 +850,14 @@ summary = {
     "model_count": len(model_list),
 }
 
-# 用于前端日期筛选的轻量全量请求快照（只保留必要字段，控制体积）
+
 requests_slim = [
     {"date": r["date"], "tokens": r["tokens"], "output": r["output"],
      "thinking_sec": r["thinking_sec"], "model": r["model"], "errors": r["errors"]}
     for r in requests
 ]
 
-# 只保留 top 300 请求用于散点图, 控制文件体积
+
 requests_trim = sorted(requests, key=lambda x: x["tokens"], reverse=True)[:300]
 for r in requests_trim:
     r["started_at"] = int(r["started_at"]) if r["started_at"] else None
@@ -874,7 +876,7 @@ out = {
     "error_detail": error_detail,
 }
 
-# 数据完整性提示：把被静默跳过的记录暴露出来，避免用户误以为报告完整
+
 warnings = []
 if skipped_trace_files:
     names = "；".join(os.path.basename(x[0]) for x in skipped_trace_files[:5])
@@ -893,7 +895,7 @@ if bad_credit_sessions:
 out["warnings"] = warnings
 
 
-# ---------- 4. 写出 ----------
+
 print("[4/4] 写出 usage-status.json / usage-status.js ...", flush=True)
 with open(OUT_JSON, "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False, indent=1)
@@ -902,16 +904,16 @@ with open(OUT_JS, "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
     f.write(";")
 
-# 自包含 HTML: 把数据 + Chart.js 都内联进模板, 去掉所有外部依赖(预览/双击均可离线打开)
+
 TPL = os.path.join(SCRIPT_DIR, "dashboard_template.html")
 CHART_JS = os.path.join(SCRIPT_DIR, "chart.umd.min.js")
-# 自包含 HTML 文件名带时间戳：每次生成独立文件，不覆盖旧报告，便于保留多份对比。
+
 OUT_HTML = os.path.join(OUT_DIR, "workbuddy-usage-status-dashboard-"
                         + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".html")
 try:
     tpl = open(TPL, "r", encoding="utf-8").read()
 
-    # 内联 Chart.js: 强依赖随包携带的 chart.umd.min.js（发布版必带，不回退 CDN，避免无网环境双击空白）
+    
     chart_tag = ""
     if os.path.exists(CHART_JS):
         chart_src = open(CHART_JS, "r", encoding="utf-8").read()
@@ -922,9 +924,9 @@ try:
     if "<!--CHART_JS-->" in tpl:
         tpl = tpl.replace("<!--CHART_JS-->", chart_tag)
 
-    # 转义 "<" 为 "\u003c"（OWASP 推荐的内联 JSON 做法）：彻底防止会话标题/模型名中的
-    # "</script>" 或 "</SCRIPT>"（HTML 标签名大小写不敏感）冲破 script 边界（本地存储型 XSS 防护）。
-    # "\u003c" 在 JS 字符串中仍解析为 "<"，数据值不变。
+    
+    
+    
     inline = '<script>window.USAGE_STATUS = ' + json.dumps(out, ensure_ascii=False).replace("<", "\\u003c") + ';</script>'
     if "<!--USAGE_DATA-->" in tpl:
         html = tpl.replace("<!--USAGE_DATA-->", inline)

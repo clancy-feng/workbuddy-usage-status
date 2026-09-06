@@ -22,6 +22,8 @@
 >   "generate a WorkBuddy usage dashboard" · "view my recent WorkBuddy usage status" · "show token / credit consumption and model distribution" · "which model is the most cost-effective" · "filter usage by date range" · "which day had the highest usage"
 >   
 >   Scope is limited to WorkBuddy's own local usage data.
+>   
+>   **Not triggered (reverse cases):** This skill does **not** apply when — ① you want usage/stats of *other products* (Cursor, VS Code, Trae, Claude, etc.); ② you only say "export my data / make me a chart / build a dashboard" without specifying *WorkBuddy's local usage*; ③ you want a generic visualization/report from arbitrary datasets. In those cases, tell the user this skill only reads `~/.workbuddy`, not other products or generic data — confirm whether they meant WorkBuddy's own usage, or point them to that product's tool.
 > 
 > - **CLI:** `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`). Python 3.10+, standard library only. Windows users please replace `python3` with `python`.
 > 
@@ -30,6 +32,8 @@
 > The full Chinese documentation is preserved below.
 
 ---
+
+> **语言与地域说明**：本文档（中文正文）面向中文 WorkBuddy 用户（zh-CN）设计，与顶部英文 `Skill Overview` 为同一份说明的双语呈现；技能的触发描述与英文能力说明另见 `SKILL.md` 的 `description`（含 `EN:` 段），可按需参照。
 
 把 WorkBuddy 自己的本地使用数据，变成一份离线可查的 Dashboard。
 
@@ -306,7 +310,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.3.0（2026-09-04）
+当前最新版本：v1.3.1（2026-09-06）
 
 ---
 

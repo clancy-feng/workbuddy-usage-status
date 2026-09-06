@@ -1,5 +1,10 @@
 # Changelog / 版本历史
 
+## [1.3.1] - 2026-09-06
+
+- **Bug fix**：修复 `--billing-token-file` 调用官方用量 API 时误引用尚未构建的 `summary` 导致运行时报错（NameError）；完成 ClawHub 安全审计整改（补充权限声明 network/file_read/file_write、token 安全警告、触发反向排除实例、中英文地域说明），降低复扫误报。
+- **文案优化**：清理脚本注释（Python `#` / CSS `/* */` / JS `//`）并精简看板与文档冗余文案。
+
 ## [1.3.0] - 2026-09-04
 
 ### 修复 · 日期范围校验

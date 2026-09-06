@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
+
 """
 verify_credit_xlsx.py — 限免模型核实工具（只读，不修改任何产物）
 
@@ -155,7 +155,7 @@ def main():
     if no_model:
         print(f"注: {no_model} 行无模型信息，未计入按模型拆分。")
 
-    # 与本地 hy3 估算对比
+    
     local_hy3 = 7127.28
     print("\n=== 与本地估算对比 ===")
     print(f"  本地 hy3 估算 credit ≈ {local_hy3:.2f}（12 个非零会话合计）")
