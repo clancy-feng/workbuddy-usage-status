@@ -2,8 +2,13 @@
 
 ## [1.3.1] - 2026-09-06
 
-- **Bug fix**：修复 `--billing-token-file` 调用官方用量 API 时误引用尚未构建的 `summary` 导致运行时报错（NameError）；完成 ClawHub 安全审计整改（补充权限声明 network/file_read/file_write、token 安全警告、触发反向排除实例、中英文地域说明），降低复扫误报。
-- **文案优化**：清理脚本注释（Python `#` / CSS `/* */` / JS `//`）并精简看板与文档冗余文案。
+### 修复 · Bug fix
+
+- 修复 `--billing-token-file` 调用官方用量 API 时误引用尚未构建的 `summary` 导致运行时报错。
+
+### 修复 · 文案调整
+
+- 优化部分文案显示和文档内容。
 
 ## [1.3.0] - 2026-09-04
 
@@ -30,14 +35,10 @@
 
 - 优化部分文案显示和文档内容。
 
-
-
 ### 📊 当前状态
 
 - Skillhub & Clawhub 双平台下载突破 1600+
-
 - SkillHub TRACE 评分 4.8（优秀）
-
 - ClawHub 搜 WorkBuddy 排第一
 
 ### ⭐ 支持
@@ -45,8 +46,6 @@
 如果这个看板帮你看清了 WorkBuddy 的用量，欢迎去 GitHub 点个 Star 支持独立开发 🙏
 
 👉 <https://github.com/clancy-feng/workbuddy-usage-status>
-
-
 
 ## [1.2.6] - 2026-08-26
 
