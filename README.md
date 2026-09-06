@@ -64,22 +64,14 @@
 
 > 💡 安装引导：国内用户优先选 SkillHub 一键安装，全球用户/OpenClaw 生态用户优先选 ClawHub 安装。
 
-### 方式一：通过 WorkBuddy 对话安装
+### 方式一：通过 SkillHub 安装（国内推荐）
 
-把 SkillHub 提供的以下提示词发给WorkBuddy：
-
-请根据 <https://skillhub.cn/install/skillhub.md> 安装workbuddy-usage-status。
+在 SkillHub 中搜索 `workbuddy-usage-status`，点击「安装」即可。
 
 ### 方式二：通过 ClawHub 安装
 
 ```
 clawhub install workbuddy-usage-status
-```
-
-### 方式三：本地手动安装
-
-```
-git clone https://gitee.com/beclancy/workbuddy-usage-status.git ~/.workbuddy/skills/workbuddy-usage-status
 ```
 
 ---
@@ -310,7 +302,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.3.1（2026-09-06）
+当前最新版本：v1.3.2（2026-09-06）
 
 ---
 

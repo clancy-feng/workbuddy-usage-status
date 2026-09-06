@@ -823,7 +823,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.3.1",
+    "version": "1.3.2",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,

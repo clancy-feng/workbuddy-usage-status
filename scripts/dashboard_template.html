@@ -950,7 +950,8 @@ function renderErrorDetail(){
 
 
 function csvCell(v){
-  const s = (v===null||v===undefined) ? '' : (''+v);
+  let s = (v===null||v===undefined) ? '' : (''+v);
+  if(/^[=+\-@]/.test(s)) s = "'" + s;   // 防 CSV 公式注入
   if(/[",\n\r]/.test(s)) return '"'+s.replace(/"/g,'""')+'"';
   return s;
 }
@@ -1081,8 +1082,5 @@ else {
   }
 }
 </script>
-<p style="text-align:center; color:#888; font-size:12px; margin-top:20px; padding:10px; border-top:1px solid #eee;" data-page-node-id="gQhyMUG2xFIvxuCE9BEPef">
-⭐ 喜欢这个看板？来 GitHub 点个 Star 支持独立开发：<a href="https:
-</p data-page-node-id="wTEcH1kbP7nEnHs0SHDJYs">
 </body>
 </html>
