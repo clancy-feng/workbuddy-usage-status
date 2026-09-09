@@ -203,7 +203,7 @@
 
 - `usage-status.json`：原始聚合数据（调试 / 二次处理用）。
 - `usage-status.js`：`window.USAGE_STATUS = {...}`，供 HTML 直接 `<script>` 引入，避开 `file://` 的 fetch 跨域。
-- `workbuddy-usage-status-dashboard-<时间戳>.html`：自包含离线看板（数据 + Chart.js 全部内联，双击即可离线打开，零外网依赖）；文件名带生成时间戳，每次生成独立文件，不覆盖旧报告，便于保留多份对比。
+- `workbuddy-usage-status-dashboard-<时间戳>.html`：离线看板，文件名带生成时间戳，每次生成独立文件，不覆盖旧报告，便于保留多份对比。
 
 运行：`python usage_extractor.py [--out 目录] [--home ~/.workbuddy]`
 

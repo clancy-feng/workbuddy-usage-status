@@ -10,7 +10,7 @@ WorkBuddy 本地 usage-status 抽取器
   - usage-status.json   原始聚合数据
   - usage-status.js     window.USAGE_STATUS = {...}  (供 HTML 直接 <script> 引入, 避开 file:// 的 fetch 跨域限制)
 """
-import sqlite3, json, os, glob, datetime, sys, argparse
+import sqlite3, json, os, glob, datetime, sys, argparse, shutil
 import urllib.request, ssl
 from collections import Counter, defaultdict
 
@@ -823,7 +823,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.3.2",
+    "version": "1.3.3",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -916,8 +916,7 @@ try:
     
     chart_tag = ""
     if os.path.exists(CHART_JS):
-        chart_src = open(CHART_JS, "r", encoding="utf-8").read()
-        chart_tag = "<script>" + chart_src + "</script>"
+        chart_tag = '<script src="chart.umd.min.js"></script>'
     else:
         sys.exit("错误：缺少随包文件 chart.umd.min.js，无法生成离线 HTML。\n"
                  "请确认该文件与 usage_extractor.py 同在 scripts/ 目录下。")
@@ -933,10 +932,10 @@ try:
     else:
         html = tpl.replace("</head>", inline + "</head>", 1)
     open(OUT_HTML, "w", encoding="utf-8").write(html)
-    offline = "离线内联"
-    print(f"已生成自包含 HTML({offline}):", OUT_HTML)
+    shutil.copy2(CHART_JS, os.path.join(OUT_DIR, "chart.umd.min.js"))
+    print("已生成看板 HTML（chart.js 外链，需与 chart.umd.min.js 同目录存放）:", OUT_HTML)
 except Exception as e:
-    print("HTML 内联跳过:", e)
+    print("HTML 生成跳过:", e)
 
 print("\n=== 完成 ===")
 print(f"请求数: {summary['total_requests']}  会话数: {summary['total_sessions']}")

@@ -1071,7 +1071,7 @@ function topN(arr, n){
   return {labels: top.map(x=>x.key||x.model), data: top.map(x=>x.val||x.tokens)};
 }
 
-if(!T){ document.getElementById('sub').textContent='数据未加载：请重新运行 usage_extractor.py 生成自包含仪表盘。'; }
+if(!T){ document.getElementById('sub').textContent='数据未加载：请重新运行 usage_extractor.py 生成看板。'; }
 else {
   try { init(); }
   catch(e){
