@@ -1,13 +1,15 @@
 > **Skill Overview**
 > 
-> WorkBuddy Usage Status turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. It ranks model cost-performance (credit per 1k tokens) with switching suggestions so you can pick the cheapest model, and now supports a date-range filter so you can zoom into any period. All model-share charts are limited to the top 10 models with the rest grouped as "Other". All data stays on your machine under `~/.workbuddy/`; **default zero network, no external APIs**. The generated dashboard is a single self-contained HTML file (Chart.js inlined), so it renders anywhere with zero dependencies. An optional **opt-in** mode can pull precise credit from WorkBuddy's official usage API using a token you manually export from your own browser (never auto-read from the host App) — see §6 known limits.
+> WorkBuddy Usage Status turns WorkBuddy's own local usage data into an offline, auditable dashboard — token spend, thinking time, thinking efficiency, model distribution, error count, and credit consumption. It ranks model cost-performance (credit per 1k tokens) with switching suggestions so you can pick the cheapest model, and now supports a date-range filter so you can zoom into any period. All model-share charts are limited to the top 10 models with the rest grouped as "Other". All data stays on your machine under `~/.workbuddy/`; **default zero network, no external APIs**. The generated dashboard is one HTML file plus a local Chart.js copy written into the same folder, so it renders offline with zero dependencies. An optional **opt-in** mode can pull precise credit from WorkBuddy's official usage API using a token you manually export from your own browser (never auto-read from the host App) — see §6 known limits.
 > 
 > **What it does**: Offline dashboard for WorkBuddy's local usage data — token / credit consumption, thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, and usage-spike analysis. Purely local **by default**, zero network dependency; an optional opt-in flag can fetch precise credit via the official usage API with a user-supplied token (disabled by default, never auto-reads host credentials).
 > 
 > **Recent updates**:
 > 
-> - **Color scheme selection** — switch between Light / Dark / system-following themes, plus several icon palettes.
-> - **Detailed credit analysis (xlsx)** — import a usage-export xlsx for precise per-day and per-model credit breakdowns.
+> - **Cache hit-rate panel** — overall hit rate, a daily trend line, and a per-model ranking (models with fewer than 10 calls are excluded).
+> - **Full-dataset CSV on every run** — a timestamped `usage-full-<timestamp>.csv` is written next to the dashboard; its headers and section names follow your OS language.
+> - **Auto-archiving against WorkBuddy's 30-day trace cleanup** — every run merges live traces with a local archive, so history keeps accumulating; a dashboard banner reminds you to run at least once every 30 days. An optional `--seed <old snapshot>` imports an older snapshot's daily totals.
+> - **Drill-down** — top-10 sessions expand into per-turn tables (time / model / status / tokens / input / cache hit / calls / tools / thinking / errors), with an optional masked prompt column; usage-peak cards expand into that day's session table and model Top 5.
 > 
 > **How to install**
 > 
@@ -25,7 +27,7 @@
 >   
 >   **Not triggered (reverse cases):** This skill does **not** apply when — ① you want usage/stats of *other products* (Cursor, VS Code, Trae, Claude, etc.); ② you only say "export my data / make me a chart / build a dashboard" without specifying *WorkBuddy's local usage*; ③ you want a generic visualization/report from arbitrary datasets. In those cases, tell the user this skill only reads `~/.workbuddy`, not other products or generic data — confirm whether they meant WorkBuddy's own usage, or point them to that product's tool.
 > 
-> - **CLI:** `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`). Python 3.10+, standard library only. Windows users please replace `python3` with `python`.
+> - **CLI:** `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`, `--credit-xlsx <file>`, `--billing-token-file <file>`, `--seed <old snapshot>`, `--no-archive`). Python 3.10+, standard library only. Windows users please replace `python3` with `python`.
 > 
 > ⭐ If this dashboard helped you see your WorkBuddy usage clearly, please give it a Star to support independent development: [github.com/clancy-feng/workbuddy-usage-status](https://github.com/clancy-feng/workbuddy-usage-status)
 > 
@@ -42,10 +44,14 @@
 ## ✨ 核心功能特性
 
 - Token/Credit 全链路可视化：按模型、按日期、按会话统计，一眼定位"烧钱大户"
-- 用量高峰探查：自动按 credit 排序列出最高的几天，逐日拆解主导会话、模型 token 构成、错误率、最大单次请求——精确到"哪一天花了多少"，帮你快速定位消耗集中日
+- 用量高峰探查：按 token 列出最高的几天，单行简介（token/credit/请求/会话/错误率）+「明细」展开当天会话表与模型 Top5。
 - 思考效率量化：输出 token ÷ 思考秒数（tok/s），横向对比模型性价比
-- 错误集中监控：快速定位报错频繁的会话/模型，降低调试成本，可导出错误详情。
-- 离线运行：Chart.js 随包附带，零外网依赖
+- 错误集中监控：快速定位报错频繁的会话/模型，降低调试成本。
+- 离线运行：Chart.js 随Skill安装附带。
+- 缓存命中率面板：整体与按模型命中率趋势，看清"谁在帮你省钱"。
+- 三级细节显示（Top10 会话 →「查看」）：轮次表含时间 / 模型 / 状态 / Token / 输入 / 缓存命中 / 调用数 / 工具数 / 思考(分) / 错误；提问列默认隐藏，勾选「显示提问」展开；每轮再点「明细」显示事件摘要。
+- 全量 CSV 同步生成：每次运行自动产出 `usage-full-<时间戳>.csv`（每日汇总 / 按模型 / 会话清单 / 调用明细（逐笔，含提问原文）/ 错误详情），表头与分区名语言自动跟随操作系统语言。
+- 自动归档合并：每次运行自动把历史运行数据并入本地归档，可用`--no-archive` 关闭此功能。
 - 只读无侵入：以只读模式访问 WorkBuddy 数据，不影响正在运行的程序
 - 跨平台兼容：支持 Windows/macOS/Linux，Python 3.10+ 即可运行
 
@@ -64,9 +70,9 @@
 
 > 💡 安装引导：国内用户优先选 SkillHub 一键安装，全球用户/OpenClaw 生态用户优先选 ClawHub 安装。
 
-### 方式一：通过 SkillHub 安装（国内推荐）
+### 方式一：通过 Workbuddy 安装（国内推荐）
 
-在 SkillHub 中搜索 `workbuddy-usage-status`，点击「安装」即可。
+在 Workbuddy 技能市场中搜索 `workbuddy-usage-status / workbuddy 使用状态看板`，点击「安装」即可。
 
 ### 方式二：通过 ClawHub 安装
 
@@ -78,7 +84,7 @@ clawhub install workbuddy-usage-status
 
 ## 3. 用法
 
-装好 skill并重启 WorkBuddy 后，有两种用法。
+装好skill并重启 WorkBuddy 后，有两种用法。
 
 ### 入口 A：对话触发
 
@@ -110,20 +116,27 @@ python3 scripts/usage_extractor.py --credit-xlsx ~/Downloads/request-usage-2026-
 # 可选（手动token注入）：直接调用官方用量 API 拉取精确 credit，无需先导出 xlsx
 # token 文件内容：从浏览器 DevTools 复制的鉴权头（如 `Cookie: ...` 整行，或 `Authorization: Bearer ...`）
 python3 scripts/usage_extractor.py --billing-token-file ~/Desktop/workbuddy-auth.txt
+
+# 可选：用旧快照（usage-status.json 或历史 dashboard HTML）恢复已被 30 天清理的日期的每日总量
+# 导入一次即持久生效（存入本地归档 ~/.workbuddy/usage-archive/），无需重复传入
+python3 scripts/usage_extractor.py --seed ~/old/workbuddy-usage-status-dashboard-20260909-224125.html
 ```
 
 Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 
 ### 看结果
 
-脚本在「输出目录」（即你运行命令时所在目录，或 `--out` 指定的目录）生成 4 个文件：
+> ⚠ **重要提示：30 天缓存期**WorkBuddy 对本机 traces 只保留 **30 天**。本 skill 每次运行自动归档累积历史（`~/.workbuddy/usage-archive/`），看板始终是全量视图——**但归档只在运行时发生**：请至少每 30 天运行一次（建议配置每日定时自动化）；断档超 30 天期间的 trace 无法追溯，首次运行只能看到最近 30 天。
 
-| 文件                                            | 说明                                 |
-| --------------------------------------------- | ---------------------------------- |
-| `workbuddy-usage-status-dashboard-<时间戳>.html` | 生成的报告文件，文件名带生成时间戳，每次生成独立文件，可保留多份对比 |
-| `usage-status.json`                           | 聚合后的原始数据，可二次处理                     |
-| `usage-status.js`                             | `window.USAGE_STATUS = {...}`，备用   |
-| `chart.umd.min.js`                            | 图表引擎文件，由脚本自动复制到输出目录，需与 HTML 同目录存放  |
+脚本在「输出目录」（即你运行命令时所在目录，或 `--out` 指定的目录）生成 5 个文件：
+
+| 文件                                            | 说明                                                             |
+| --------------------------------------------- | -------------------------------------------------------------- |
+| `workbuddy-usage-status-dashboard-<时间戳>.html` | 生成的报告文件，文件名带生成时间戳，每次生成独立文件，可保留多份对比                             |
+| `usage-status.json`                           | 聚合后的原始数据，可二次处理                                                 |
+| `usage-status.js`                             | `window.USAGE_STATUS = {...}`，备用                               |
+| `chart.umd.min.js`                            | 图表引擎文件，由脚本自动复制到输出目录，需与 HTML 同目录存放                              |
+| `usage-full-<时间戳>.csv`                        | 全量数据 CSV（每日汇总 / 按模型 / 会话清单 / 调用明细 / 错误分区），与看板同源；内置浏览器无法下载时直接取用 |
 
 打开最新生成的 `workbuddy-usage-status-dashboard-*.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 Token消耗会话表 + 每日错误。四张时序图的横轴会按所选日期范围的跨度自动在「日 / 周 / 月」之间切换（≤120 天按日，120–730 天按周，>730 天按月），日期选择在修改起止日期后看板立即刷新。
 
@@ -227,13 +240,14 @@ python3 scripts/usage_extractor.py --out ./report
 
 ## 5. 指标来源及算法（详见 DATA-GUIDE.md）
 
-| 指标        | 算法                                                                | 数据来源                        |
-| --------- | ----------------------------------------------------------------- | --------------------------- |
-| 思考用时      | 每条 trace 里 `type=generation` 的 span 时长之和                          | `traces/*/trace_*.json`     |
-| 思考效率      | 输出 token ÷ 思考秒数（tok/s）                                            | `traces/*/trace_*.json`     |
-| token 消耗  | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合                                 | `traces/*/trace_*.json`     |
-| credit 消耗 | `session_usage.credit_json` 会话级汇总；看板默认归到会话首次出现日；提供用量导出 xlsx 精确分析。 | `workbuddy.db`              |
-| Top 会话    | 按 token 消耗降序取前 10 个会话，列出标题/token/思考时长/credit/错误数                  | `traces/*` + `workbuddy.db` |
+| 指标        | 算法                                                                                                          | 数据来源                        |
+| --------- | ----------------------------------------------------------------------------------------------------------- | --------------------------- |
+| 思考用时      | 每条 trace 里 `type=generation` 的 span 时长之和                                                                    | `traces/*/trace_*.json`     |
+| 思考效率      | 输出 token ÷ 思考秒数（tok/s）                                                                                      | `traces/*/trace_*.json`     |
+| token 消耗  | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合                                                                           | `traces/*/trace_*.json`     |
+| 缓存命中率     | `totalCachedTokens ÷ totalInputTokens`（若实测 cached>input 自动切换为 `cached/(in+cached)`），按天/模型聚合；模型排行仅收录调用数 ≥ 10 | `traces/*/trace_*.json`     |
+| credit 消耗 | `session_usage.credit_json` 会话级汇总；看板默认归到会话首次出现日；提供用量导出 xlsx 精确分析。                                           | `workbuddy.db`              |
+| Top 会话    | 按 token 消耗降序取前 10 个会话，列出标题/token/思考时长/credit/错误数                                                            | `traces/*` + `workbuddy.db` |
 
 ---
 
@@ -245,9 +259,10 @@ python3 scripts/usage_extractor.py --out ./report
 
 3. **可选联网模式（`--billing-token-file`，默认关闭）：**
 - 仅在用户**主动**传入该参数时才发起一次出站 HTTPS 请求，且只拉取**用户本人**的用量数据（第一方端点 `workbuddy.cn`，与用量页同一数据源）。
+  
   - 凭据**必须由用户手动提供**：token 文件内容是用户从自己浏览器 DevTools 复制的鉴权头。
   - token 文件等同会话凭证：不要提交仓库、限制文件权限，用后可在 workbuddy.cn 退出登录使其失效。
-  - 
+4. **WorkBuddy 现只保留最近 30 天的 traces**：超期的逐笔明细会被删除。本 skill 每次运行会自动归档（`~/.workbuddy/usage-archive/`），之后被清理也不影响看板——但归档只在运行时发生：**请至少每 30 天运行一次**（建议配置每日定时自动化）；断档超 30 天期间的逐笔明细无法追溯，首次运行只能看到最近 30 天。被清理日期的每日总量可用 `--seed <旧快照>` 恢复。
 
 ---
 
@@ -283,6 +298,10 @@ A：看板是按需生成的静态 HTML（配套 chart.umd.min.js 同目录存�
 
 A：全量解析 traces（可能上千文件）只需一次，约 10–30 秒，之后每次都很快（见已知限制第 2条）。
 
+**Q：为什么看板只覆盖最近 30 天？更早的数据去哪了？**
+
+A：WorkBuddy 会自动清理 30 天前的本地 traces，已清理日期的对话本身不受影响，只是逐次调用的明细没了。本 skill 每次运行会先把数据归档到 `~/.workbuddy/usage-archive/`，之后被清理也不影响看板；但**归档只在运行时发生**——超过 30 天没运行，断档期间的明细无法追溯。补救：用清理前生成的历史快照执行 `--seed <快照>`，可恢复更早日期的每日总量；并建议配置每日定时自动化，避免再断档。
+
 **Q：对话里怎么说才能触发这个 skill？**
 
 A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，无需记关键词。
@@ -303,7 +322,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.3.3（2026-09-09）
+当前最新版本：v1.4.0（2026-09-16）
 
 ---
 
@@ -332,4 +351,4 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 ---
 
-🏆 SkillHub TRACE 评分 4.8/5.0 · ClawHub 搜索 "WorkBuddy" 排名第一
+🏆 SkillHub TRACE 评分 4.7/5.0 · ClawHub 搜索 "WorkBuddy" 排名第一

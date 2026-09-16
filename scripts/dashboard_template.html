@@ -118,6 +118,7 @@
       <option value="rose" data-page-node-id="PO5ttwHuJF1YQLU6z26N4D">蔷薇粉</option>
     </select>
     <button class="lang-toggle" id="langToggle" data-page-node-id="Koi8Un2TcTKihTzHGzdDfO">EN</button>
+    <label class="ctrl-btn" style="cursor:pointer;user-select:none"><input type="checkbox" id="showQChk" style="vertical-align:middle"> 显示提问</label>
   </div>
 </header>
 <div id="dataWarn" style="display:none;margin:12px 16px;padding:10px 14px;border:1px solid #e0a800;border-radius:8px;background:#fff8e1;color:#7a5b00;font-size:13px;line-height:1.6" data-page-node-id="xL0Tk8WqYMbMs8lK0FqVWi"></div>
@@ -145,7 +146,7 @@
     <div class="card full" data-page-node-id="GYa9pMPmi52tJQHTYuIhLq"><h3 data-i18n="cardTopSessions" data-page-node-id="rDWJIuJRW5nhYWBvflK8Uv">Top 10 会话</h3><div class="hint" data-i18n="hintTopSessions" data-page-node-id="SgGwTQOK4mQnsrNLTUCY5C">会话标题 + 模型 + 思考用时 + credit 消耗</div>
       <div class="tbl-scroll" data-page-node-id="WmOGZZRaNMMuu0nJhd0WUx"><table id="tSessions" data-page-node-id="HhRBFtx2pMugabO7d5wAPC"><thead data-page-node-id="nYvztovckmbAooBQUCBDU9"><tr data-page-node-id="34go4Dsor32mEHes0PfljC">
         <th data-i18n="thSession" data-page-node-id="btA24cy0mPM3wfMuUULiMj">会话标题</th><th data-i18n="thModel" data-page-node-id="BhOqnMRKghNMOG8bCwdxC6">模型</th><th class="num" data-i18n="thReq" data-page-node-id="05AGIgcl5FvHMPlmlJWhxE">请求数</th><th class="num" data-i18n="thToken" data-page-node-id="kPOIPCerw20jEUADOSZ67S">Token</th>
-        <th class="num" data-i18n="thThink" data-page-node-id="jS36FgiNfSLwlysSbUWJS3">思考(分)</th><th class="num" data-i18n="thCredit" data-page-node-id="8N0HFF9SPYiIGsktMuDgzp">Credit</th><th class="num" data-i18n="thErr" data-page-node-id="IaVskGOQZ5sXQAIdNwITih">错误</th><th data-i18n="thStatus" data-page-node-id="770khjS86LKkMPxbGvaKAP">状态</th>
+        <th class="num" data-i18n="thThink" data-page-node-id="jS36FgiNfSLwlysSbUWJS3">思考(分)</th><th class="num" data-i18n="thCredit" data-page-node-id="8N0HFF9SPYiIGsktMuDgzp">Credit</th><th class="num" data-i18n="thErr" data-page-node-id="IaVskGOQZ5sXQAIdNwITih">错误</th><th data-i18n="thStatus" data-page-node-id="770khjS86LKkMPxbGvaKAP">状态</th><th>操作</th>
       </tr></thead><tbody data-page-node-id="DYHX6YGNWfhTsHoJZkkQRu"></tbody></table></div>
     </div>
     <div class="card full" id="spikeCard" data-page-node-id="K8BDzvOJUikeZDABYUygzi">
@@ -161,13 +162,13 @@
       </tr></thead><tbody data-page-node-id="8xPfbwkFdlvy9kRAepJEmH"></tbody></table></div>
       <div class="note" id="modelTips" data-page-node-id="2lUN6Y5lV8rZeMxe3kt0o2"></div>
     </div>
-    <div class="card full" data-page-node-id="jLCbPs3ktzLpq7fg79hFtu"><h3 data-i18n="cardErrors" data-page-node-id="R9MlfLX0YD5xzUsa9z18hn">每日错误数</h3><div class="hint" data-i18n="hintErrors" data-page-node-id="iqcLJZo6fFlxGfJgArwQcq">span 级 status=error 的计数</div><canvas id="cErrors" data-page-node-id="aJjBvlO8YV4DFcux6YhW1j"></canvas></div>
-    <div class="card full" id="errDetailCard" data-page-node-id="BEk0gSV2nGuG4OAL43fkmi">
-      <h3 data-page-node-id="KGbCwctiNulh9xKG6HK8PT">错误明细 <span class="est-badge local" data-page-node-id="PNrJepfn8Rr0GR79j937sn">全量</span>
-        <button class="ctrl-btn" id="btnErrCsv" type="button" style="float:right;margin-top:-3px;" data-page-node-id="0xpheJ5CyuxepkRQsB5ro8">导出 CSV</button>
-      </h3>
-      <div id="errDetail" data-page-node-id="XDtXJKexqH7rpExNAWLrL2"></div>
+    <div class="card full" id="cacheCard" style="display:none">
+      <h3>缓存命中率 <span id="cacheOverall" style="font-weight:700"></span> <span id="cacheCaliber" style="font-size:11px;font-weight:400;opacity:.7"></span></h3>
+      <div class="hint">缓存命中 token 占输入 token 的比例；命中率越高，同等任务的实际计费输入越少。排行仅收录调用数 ≥ 10 的模型。</div>
+      <canvas id="cCacheRate"></canvas>
+      <div class="tbl-scroll"><table id="tCacheModel"><thead><tr><th>模型</th><th class="num">调用数</th><th class="num">输入 token</th><th class="num">命中 token</th><th class="num">命中率</th></tr></thead><tbody></tbody></table></div>
     </div>
+    <div class="card full" data-page-node-id="jLCbPs3ktzLpq7fg79hFtu"><h3 data-i18n="cardErrors" data-page-node-id="R9MlfLX0YD5xzUsa9z18hn">每日错误数</h3><div class="hint" data-i18n="hintErrors" data-page-node-id="iqcLJZo6fFlxGfJgArwQcq">span 级 status=error 的计数</div><canvas id="cErrors" data-page-node-id="aJjBvlO8YV4DFcux6YhW1j"></canvas></div>
   </div>
 
   <div class="note" id="note" data-page-node-id="MSgOBEHyp90yhB8BxZwtTP"></div>
@@ -176,6 +177,11 @@
 <!--USAGE_DATA-->
 <script>
 const T = window.USAGE_STATUS;
+// v1.4.0 下钻/脱敏状态（必须在 init() 首次 render 之前完成赋值）
+var __sessFilt = [];
+var __drillOpen = {};
+var __showQ = false;
+var __spikeOpen = {};
 const charts = [];
 
 
@@ -249,6 +255,11 @@ const I18N = {
     cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
     cardSpike: "Usage Spike Explorer", cardCost: "Model Cost Efficiency (credit / 100k token)",
     cardErrors: "Daily Errors",
+    warnArchiveFirst: "A local archive (~/.workbuddy/usage-archive) was created on this run. WorkBuddy keeps local traces for only 30 days - run this skill at least once every 30 days (a daily automation is recommended); activity during gaps longer than 30 days cannot be traced back.",
+    warnSeed: (r,c)=>`Restored daily totals for ${r} day(s) and corrected ${c} day(s) from an older snapshot; per-request details for those days are unavailable (not present in the snapshot).`,
+    warnOrphan: (n,x)=>`${n} historical session(s) totaling ${x} credit have no local per-request details left; they are not shown per-day in the trend.`,
+    warnSkipped: (n,names)=>`Skipped ${n} corrupted/unreadable trace file(s) (report may be incomplete): ${names}`,
+    warnBadCredit: (n)=>`${n} session(s) had unparseable credit_json; their credit is counted as 0 (token and daily trends unaffected).`,
     hintModelShare: "Aggregated by model name; Top10 merged into “Others”.",
     hintModelEff: "output token / think seconds",
     hintScatter: "Each point = one request; top-left = high output, low time = efficient.",
@@ -615,8 +626,24 @@ function init(){
   });
   setupThemeSkin();
   applyStaticLang();
-  const btnErrCsv = document.getElementById('btnErrCsv');
-  if(btnErrCsv) btnErrCsv.addEventListener('click', exportErrorCsv);
+  const tbSess = document.querySelector('#tSessions');
+  if (tbSess) tbSess.addEventListener('click', function(ev){
+    const b = ev.target.closest ? ev.target.closest('button[data-drill]') : null;
+    if (b) { const sid = b.getAttribute('data-drill'); __drillOpen[sid] = !__drillOpen[sid]; renderSessions(__sessFilt); return; }
+    const b2 = ev.target.closest ? ev.target.closest('button[data-turn]') : null;
+    if (b2) {
+      const sid2 = b2.getAttribute('data-sid'), ts2 = Number(b2.getAttribute('data-turn'));
+      (T.requests_full||[]).forEach(function(r){ if (r.sid===sid2 && r.ts===ts2) r._open = !r._open; });
+      renderSessions(__sessFilt);
+    }
+  });
+  const rcChk = document.getElementById('showQChk');
+  if (rcChk) rcChk.addEventListener('change', function(){ __showQ = rcChk.checked; renderSessions(__sessFilt); });
+  const sdHost = document.getElementById('spikeDays');
+  if (sdHost) sdHost.addEventListener('click', function(ev){
+    const b = ev.target.closest ? ev.target.closest('button[data-spike]') : null;
+    if (b) { const d = b.getAttribute('data-spike'); __spikeOpen[d] = !__spikeOpen[d]; renderSpikeDays(); }
+  });
   const xlsxFileEl = document.getElementById('xlsxFile');
   if (xlsxFileEl) xlsxFileEl.addEventListener('change', ()=>{
     if (xlsxFileEl.files && xlsxFileEl.files[0]) handleXlsxUpload(xlsxFileEl.files[0]);
@@ -626,10 +653,21 @@ function init(){
   renderWarnings();
 }
 
+function warnText(w){
+  if (LANG === 'zh') return w.detail;
+  switch (w.type) {
+    case 'archive_first_run': return t('warnArchiveFirst');
+    case 'seed_restore': return t('warnSeed')(w.restored||0, w.corrected||0);
+    case 'orphan_credit': return t('warnOrphan')(w.count||0, (w.amount||0).toFixed(2));
+    case 'skipped_traces': return t('warnSkipped')(w.count||0, w.names || '');
+    case 'bad_credit': return t('warnBadCredit')(w.count||0);
+    default: return w.detail;
+  }
+}
 function renderWarnings(){
   const el = document.getElementById('dataWarn');
   if (!el || !T || !T.warnings || !T.warnings.length) return;
-  el.innerHTML = '⚠ ' + T.warnings.map(w => esc(w.detail)).join('<br>⚠ ');
+  el.innerHTML = '⚠ ' + T.warnings.map(function(w){ return esc(warnText(w)); }).join('<br>⚠ ');
   el.style.display = 'block';
 }
 
@@ -660,12 +698,14 @@ function buildBuckets(dayFilt, gran){
     if (gran === 'day') key = d.date;
     else if (gran === 'week') key = isoWeekStart(d.date);
     else key = d.date.slice(0,7); 
-    if(!map.has(key)) map.set(key, {label:key, tokens:0, credit:0, thinking_sec:0, errors:0});
+    if(!map.has(key)) map.set(key, {label:key, tokens:0, credit:0, thinking_sec:0, errors:0, cached:0, input:0});
     const b = map.get(key);
     b.tokens += d.tokens||0;
     b.credit += d.credit||0;
     b.thinking_sec += d.thinking_sec||0;
     b.errors += d.errors||0;
+    b.cached += d.cached||0;
+    b.input += d.input||0;
   });
   return [...map.values()].sort((a,b)=> a.label < b.label ? -1 : (a.label > b.label ? 1 : 0));
 }
@@ -818,15 +858,35 @@ function render(start, end){
     datasets:[{label:t('dsErr'),data:buckets.map(b=>b.errors),backgroundColor:'#ff5c5c'}]},
     options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid}}}}));
 
+  const cacheCard = document.getElementById('cacheCard');
+  const calib = (T.summary && T.summary.cache_caliber) || 'cached/in';
+  if (cacheCard && T.summary && T.summary.cache_rate != null){
+    cacheCard.style.display='';
+    const cRate = document.getElementById('cCacheRate');
+    const rateData = buckets.map(function(b){
+      const den = (calib === 'cached/(in+cached)') ? ((b.input||0)+(b.cached||0)) : (b.input||0);
+      return den ? Math.round((b.cached||0)/den*1000)/10 : null;
+    });
+    charts.push(new Chart(cRate,{type:'line',data:{labels:buckets.map(b=>b.label),
+      datasets:[{label:'命中率%',data:rateData,borderColor:'#2fbf71',backgroundColor:'rgba(47,191,113,.15)',fill:true,tension:.3,pointRadius:2}]},
+      options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:function(v){return v+'%';}}}}}}));
+    const tcm2 = document.querySelector('#tCacheModel tbody');
+    if (tcm2){
+      const rows2 = (T.cache_model||[]).slice(0,10);
+      tcm2.innerHTML = rows2.length ? rows2.map(function(m){
+        return '<tr><td><span class="tag">'+esc(m.model)+'</span></td><td class="num">'+m.calls+'</td>' +
+          '<td class="num">'+fmt(m.input)+'</td><td class="num">'+fmt(m.cached)+'</td>' +
+          '<td class="num">'+(m.rate==null?'—':m.rate+'%')+'</td></tr>';
+      }).join('') : '<tr><td colspan="5">样本不足（调用数 ≥ 10 才入榜）</td></tr>';
+    }
+    const crEl = document.getElementById('cacheOverall');
+    if (crEl) crEl.textContent = T.summary.cache_rate + '%';
+    const cbEl = document.getElementById('cacheCaliber');
+    if (cbEl) cbEl.textContent = '口径: ' + calib;
+  } else if (cacheCard) { cacheCard.style.display='none'; }
+
   
-  const tb=document.querySelector('#tSessions tbody');
-  tb.innerHTML=sessFilt.slice(0,10).map(x=>`<tr>
-    <td>${esc(x.title||'(无标题)')}</td><td><span class="tag">${esc(x.models||'?')}</span></td>
-    <td class="num">${x.requests}</td><td class="num">${fmt(x.tokens)}</td>
-    <td class="num">${(x.thinking_sec/60).toFixed(1)}</td>
-    <td class="num">${x.credit}</td>
-    <td class="num ${x.errors?'err':''}">${x.errors}</td>
-    <td>${esc(x.status||'')}</td></tr>`).join('');
+  renderSessions(sessFilt);
 
   
   
@@ -925,13 +985,10 @@ function renderErrorDetail(){
   const host = document.getElementById('errDetail');
   if(!host) return;
   const ed = T.error_detail;
-  const btn = document.getElementById('btnErrCsv');
   if(!ed || !ed.total){
     host.innerHTML = `<div class="note">全量数据下无错误记录。</div>`;
-    if(btn) btn.disabled = true;
     return;
   }
-  if(btn) btn.disabled = false;
   const pct = c => (ed.total ? (c / ed.total * 100).toFixed(1) : '0.0') + '%';
   const msgRows = (ed.top_messages||[]).map(x =>
     `<tr><td>${esc(x.msg)}</td><td class="num">${x.count}</td><td class="num">${pct(x.count)}</td></tr>`).join('')
@@ -956,81 +1013,43 @@ function csvCell(v){
   return s;
 }
 
-function exportErrorCsv(){
-  const ed = T.error_detail;
-  if(!ed || !ed.total){ alert('无错误数据可导出。'); return; }
-  const lines = [];
-  const push = arr => lines.push(arr.map(csvCell).join(','));
-  const pct = c => (ed.total ? (c / ed.total * 100).toFixed(1) + '%' : '0.0%');
-  lines.push('# 错误明细导出（全量，不受日期筛选影响）');
-  lines.push('# 生成时间：' + new Date().toISOString());
-  lines.push('# 全量错误总数：' + ed.total);
-  lines.push('');
-  lines.push('## 高频错误信息');
-  push(['错误信息','次数','占比']);
-  (ed.top_messages||[]).forEach(x => push([x.msg, x.count, pct(x.count)]));
-  lines.push('');
-  lines.push('## 按错误类型');
-  push(['类型','次数']);
-  (ed.by_type||[]).forEach(x => push([x.type, x.count]));
-  lines.push('');
-  lines.push('## 按工具');
-  push(['工具','次数']);
-  (ed.by_tool||[]).forEach(x => push([x.tool, x.count]));
-  lines.push('');
-  lines.push('## 按模型');
-  push(['模型','次数','主导错误']);
-  (ed.by_model||[]).forEach(x => push([x.model, x.count, x.top_msg]));
-  lines.push('');
-  lines.push('## 按会话');
-  push(['会话','次数','主导错误']);
-  (ed.by_session||[]).forEach(x => push([x.title || '(无标题)', x.count, x.top_msg]));
-  lines.push('');
-  lines.push('## 近期错误样本');
-  push(['日期','会话ID','模型','工具','错误信息']);
-  (ed.samples||[]).forEach(x => push([x.date, x.session_id, x.model, x.tool, x.msg]));
-  const csv = '﻿' + lines.join('\r\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'workbuddy-error-detail-' + new Date().toISOString().slice(0,10) + '.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-}
+
 function renderSpikeDays(){
   const host = document.getElementById('spikeDays');
   if(!host) return;
   const arr = (T.spike_days || []);
   if(!arr.length){ host.innerHTML = `<div class="note">${t('spikeNoData')}</div>`; return; }
   host.innerHTML = arr.map(s => {
-    const sessRows = (s.top_sessions || []).map(x =>
-      `<tr><td>${esc(x.title || '(无标题)')}</td><td><span class="tag">${esc(x.model)}</span></td>
-        <td class="num">${fmt(x.tokens)}</td></tr>`).join('');
-    const mdl = (s.model_token_top || []).filter(m => m.tokens > 0).map(m => `${esc(m.model)} ${short(m.tokens)}`).join('<br>');
-    return `<div class="spike-day">
-      <div class="spike-head">
-        <span class="spike-date">${s.date}</span>
-        <span class="spike-credit">${short(s.tokens)} tok</span>
-        <span class="tag">${s.requests} ${t('spikeReq')}</span>
-        <span class="tag">${s.sessions} ${t('spikeSess')}</span>
-        <span class="tag">${t('spikeErrRate')} ${s.err_rate}%</span>
-        <span class="tag">${t('spikeAvgCalls')} ${s.avg_calls}</span>
-        <span class="tag">${t('spikeMaxReq')} ${short(s.max_request_tokens)} tok</span>
-        ${s.top_error_msg ? `<span class="tag">主导错误 ${esc(s.top_error_msg)}</span>` : ''}
-      </div>
-      <div class="spike-body">
+    const open = !!__spikeOpen[s.date];
+    let h = '<div class="spike-day"><div class="spike-head">' +
+      '<span class="spike-date">'+s.date+'</span>' +
+      '<span class="spike-credit">'+short(s.tokens)+' tok</span>' +
+      '<span class="tag">'+(s.credit!=null?short(s.credit)+' credit':'')+'</span>' +
+      '<span class="tag">'+s.requests+' '+t('spikeReq')+'</span>' +
+      '<span class="tag">'+s.sessions+' '+t('spikeSess')+'</span>' +
+      '<span class="tag">'+t('spikeErrRate')+' '+s.err_rate+'%</span>' +
+      '<button class="ctrl-btn" data-spike="'+s.date+'">'+(open?'收起':'明细')+'</button>' +
+      '</div>';
+    if (open){
+      const sessRows = (s.top_sessions || []).map(x =>
+        `<tr><td>${esc(x.title || '(无标题)')}</td><td><span class="tag">${esc(x.model)}</span></td>` +
+        `<td class="num">${fmt(x.tokens)}</td></tr>`).join('');
+      const mdlRows = (s.model_token_top || []).filter(m => m.tokens > 0).map((m, i) =>
+        `<tr><td class="num">${i+1}</td><td><span class="tag">${esc(m.model)}</span></td>` +
+        `<td class="num">${fmt(m.tokens)}</td></tr>`).join('');
+      h += `<div class="spike-body">
         <div class="spike-col"><div class="spike-sub">${t('spikeSubSessions')}</div>
           <table><thead><tr><th>${t('thSess2')||t('thSession')}</th><th>${t('thModel')}</th><th class="num">${t('thToken2')||t('thToken')}</th></tr></thead>
           <tbody>${sessRows || `<tr><td colspan="3">${t('spikeNone')}</td></tr>`}</tbody></table></div>
-        <div class="spike-col"><div class="spike-sub">${t('spikeSubModel')}</div>
-          <div class="spike-mdl">${mdl || t('spikeNone')}</div></div>
+        <div class="spike-col"><div class="spike-sub">${t('spikeSubModel')}（Top 5）</div>
+          <table><thead><tr><th class="num">#</th><th>模型</th><th class="num">Token</th></tr></thead>
+          <tbody>${mdlRows || `<tr><td colspan="3">${t('spikeNone')}</td></tr>`}</tbody></table></div>
       </div>
-      ${s.n_hidden ? `<div class="note" style="margin-top:8px;">${t('spikeHidden')(s.n_hidden, short(s.hidden_tokens))}</div>` : ''}
-    </div>`;
+      ${s.n_hidden ? `<div class="note" style="margin-top:8px;">${t('spikeHidden')(s.n_hidden, short(s.hidden_tokens))}</div>` : ''}`;
+    }
+    return h + '</div>';
   }).join('');
 }
-
 function groupTokensByModel(reqs){
   const m={};
   reqs.forEach(r=>{
@@ -1080,6 +1099,84 @@ else {
     if(subEl) subEl.innerHTML = '<span class="err">渲染出错：' + esc(msg) + '</span>';
     if (typeof console !== 'undefined' && console.error) console.error(e);
   }
+}
+
+// ===== v1.4.0: 缓存面板 / 三级下钻 / 全量CSV =====
+function maskText(s){
+  if(!s) return '';
+  var out = (''+s)
+    .replace(/([\w.+-]{1,2})[\w.+-]*@([\w-]+\.)+[\w-]+/g, function(m){ var p=m.split('@'); return p[0].slice(0,2)+'***@'+p[1]; })
+    .replace(/(1[3-9]\d)\d{4}(\d{4})/g, '$1****$2')
+    .replace(/((?:[A-Za-z]:\\|\/Users\/|\/home\/)[^\s"'<>]{3,})/g, function(m){ return m.slice(0,12)+'***'; })
+    .replace(/([A-Za-z0-9]{24,})/g, function(m){ return m.slice(0,6)+'***'+m.slice(-4); });
+  return out.length > 60 ? out.slice(0,60)+'…' : out;
+}
+function dispPrompt(q){
+  if(!q) return '<span style="opacity:.5">—</span>';
+  return esc(maskText(q));
+}
+function fmtTime(tsSec){
+  if(!tsSec) return '—';
+  var d = new Date(tsSec*1000);
+  function p(n){ return (n<10?'0':'')+n; }
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+function renderSessions(sessFilt){
+  __sessFilt = sessFilt || [];
+  var tb = document.querySelector('#tSessions tbody');
+  if(!tb) return;
+  var rows = __sessFilt.slice(0,10);
+  tb.innerHTML = rows.map(function(x){
+    var sid = x.session_id || '';
+    var open = !!__drillOpen[sid];
+    var h = '<tr>' +
+      '<td>'+esc(x.title||'(无标题)')+'</td><td><span class="tag">'+esc(x.models||'?')+'</span></td>' +
+      '<td class="num">'+x.requests+'</td><td class="num">'+fmt(x.tokens)+'</td>' +
+      '<td class="num">'+(x.thinking_sec/60).toFixed(1)+'</td>' +
+      '<td class="num">'+x.credit+'</td>' +
+      '<td class="num '+(x.errors?'err':'')+'">'+x.errors+'</td>' +
+      '<td>'+esc(x.status||'')+'</td>' +
+      '<td><button class="ctrl-btn" data-drill="'+esc(sid)+'">'+(open?'收起':'查看')+'</button></td></tr>';
+    if (open) h += '<tr><td colspan="9">'+drillHtml(sid)+'</td></tr>';
+    return h;
+  }).join('');
+}
+function drillHtml(sid){
+  var turns = (T.requests_full||[]).filter(function(r){ return r.sid === sid; })
+    .sort(function(a,b){ return b.ts - a.ts; });
+  if (!turns.length) return '<div style="color:var(--muted,#9aa3b2);padding:8px">无轮次数据</div>';
+  var showQ = !!__showQ;
+  var colspan = showQ ? 12 : 11;
+  var headQ = showQ ? '<th style="text-align:left">提问</th>' : '';
+  var rows = turns.map(function(r){
+    var main = '<tr>' +
+      '<td>'+fmtTime(r.ts)+'</td><td><span class="tag">'+esc(r.model)+'</span></td>' +
+      '<td class="num '+((r.st && r.st!=='ok')?'err':'')+'">'+esc(r.st||'ok')+'</td>' +
+      '<td class="num">'+fmt(r.tk)+'</td><td class="num">'+fmt(r.inp)+'</td>' +
+      '<td class="num">'+fmt(r.ca)+'</td><td class="num">'+r.calls+'</td>' +
+      '<td class="num">'+r.tools+'</td><td class="num">'+(r.think?(r.think/60).toFixed(1):'0.0')+'</td>' +
+      '<td class="num '+(r.errs?'err':'')+'">'+r.errs+'</td>' +
+      (showQ ? '<td>'+dispPrompt(r.q)+'</td>' : '') +
+      '<td><button class="ctrl-btn" data-sid="'+esc(r.sid)+'" data-turn="'+r.ts+'">'+(r._open?'收起':'明细')+'</button></td></tr>';
+    if (r._open) main += '<tr><td colspan="'+colspan+'">'+turnDetailHtml(r)+'</td></tr>';
+    return main;
+  }).join('');
+  return '<div style="max-height:420px;overflow:auto;margin:6px 0"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>' +
+    '<th style="text-align:left">时间</th><th>模型</th><th>状态</th><th style="text-align:right">Token</th><th style="text-align:right">输入</th><th style="text-align:right">缓存命中</th>' +
+    '<th style="text-align:right">调用</th><th style="text-align:right">工具</th><th style="text-align:right">思考(分)</th><th style="text-align:right">错误</th>' + headQ + '<th></th>' +
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function turnDetailHtml(r){
+  var html = '<div style="font-size:12px;line-height:1.8;padding:4px 8px">' +
+    '<b>事件摘要：</b>生成 '+(r.gen_n||0)+' 段 / '+((r.gen_ms||0)/1000).toFixed(1)+'s · 工具 '+((r.tl||[]).length)+' 项 · 错误 '+((r.el||[]).length)+' 条';
+  if ((r.tl||[]).length){
+    html += '<div><b>工具调用：</b>' + r.tl.map(function(x){ return esc(x[0])+' '+((x[1]||0)/1000).toFixed(1)+'s'; }).join('、') + '</div>';
+  }
+  if ((r.el||[]).length){
+    html += '<div style="color:var(--red,#e5484d)"><b>错误：</b>' + r.el.map(function(x){ var tl2 = x[1] ? '['+esc(x[1])+']' : ''; return esc(x[0])+tl2+': '+esc(x[2]); }).join('；') + '</div>';
+  }
+  html += '</div>';
+  return html;
 }
 </script>
 </body>

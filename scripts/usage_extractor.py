@@ -10,7 +10,7 @@ WorkBuddy 本地 usage-status 抽取器
   - usage-status.json   原始聚合数据
   - usage-status.js     window.USAGE_STATUS = {...}  (供 HTML 直接 <script> 引入, 避开 file:// 的 fetch 跨域限制)
 """
-import sqlite3, json, os, glob, datetime, sys, argparse, shutil
+import sqlite3, json, os, glob, datetime, sys, argparse, shutil, re
 import urllib.request, ssl
 from collections import Counter, defaultdict
 
@@ -38,6 +38,10 @@ error_samples = []
 
 
 parser = argparse.ArgumentParser(description="WorkBuddy 本地 usage-status 抽取器")
+parser.add_argument("--seed", default=None,
+                    help="旧快照种子（usage-status.json 或历史 dashboard HTML）：恢复已被清理日期的每日总量")
+parser.add_argument("--no-archive", action="store_true",
+                    help="禁用本地归档合并（默认开启：自动累积历史，对抗 WorkBuddy 30 天 trace 清理）")
 parser.add_argument("--out", default=os.getcwd(),
                     help="输出目录 (默认: 当前工作目录)")
 parser.add_argument("--home", default=HOME,
@@ -387,6 +391,10 @@ for i, fp in enumerate(files):
     tool_ms = 0
     tool_count = 0
     err_count = 0
+    gen_count = 0
+    gen_ms = 0
+    tool_items = []
+    err_items = []
     dk = day_key(started)   
     
     
@@ -410,13 +418,19 @@ for i, fp in enumerate(files):
             if session_id:
                 err_by_session.setdefault(session_id, Counter())[emsg] += 1
             err_by_day.setdefault(dk, Counter())[emsg] += 1
+            if len(err_items) < 20:
+                err_items.append([str(etype)[:30], str(etool)[:30], str(emsg)[:120]])
         t = s.get("type")
         d = s.get("duration") or 0
         if t == "generation":
             thinking_ms += d
+            gen_count += 1
+            gen_ms += d
         elif t in ("tool", "mcp", "function"):
             tool_ms += d
             tool_count += 1
+            if len(tool_items) < 20:
+                tool_items.append([str(s.get("toolName") or s.get("name") or t)[:40], int(d)])
     thinking_sec = ms_to_sec(thinking_ms)
 
     rec = {
@@ -438,6 +452,10 @@ for i, fp in enumerate(files):
         "tool_count": tool_count,
         "span_count": tr.get("spanCount") or len(spans),
         "errors": err_count,
+        "gen_n": gen_count,
+        "gen_ms": gen_ms,
+        "tl": tool_items,
+        "el": err_items,
     }
     requests.append(rec)
 
@@ -508,6 +526,222 @@ for i, fp in enumerate(files):
 
 
 
+
+
+# ---------- [2.7.5] 自动归档合并（traceId 去重，透明常驻） ----------
+ARCHIVE_DIR = os.path.join(HOME, "usage-archive")
+archive_existed = False
+archived_only = []
+if args.no_archive:
+    print("[2.7.5] 归档已禁用（--no-archive）", flush=True)
+else:
+    try:
+        os.makedirs(ARCHIVE_DIR, exist_ok=True)
+        aj = os.path.join(ARCHIVE_DIR, "requests.jsonl")
+        archive_existed = os.path.exists(aj)
+        arch_recs = {}
+        if archive_existed:
+            with open(aj, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        o = json.loads(line)
+                        if o.get("id"):
+                            arch_recs[o["id"]] = o
+                    except Exception:
+                        continue
+        live_ids = {r["id"] for r in requests if r.get("id")}
+        new_from_live = [r for r in requests if r.get("id") and r["id"] not in arch_recs]
+        for r in new_from_live:
+            arch_recs[r["id"]] = r
+        archived_only = [o for o in arch_recs.values() if o["id"] not in live_ids]
+        # 归档独有的错误重放进全局错误统计（el = [type, tool, msg]）
+        for r in archived_only:
+            _dk = r.get("date") or ""
+            _mdl = r.get("model") or "unknown"
+            _sid = r.get("session_id") or ""
+            for it in (r.get("el") or []):
+                _e = (list(it) + ["", "", ""])[:3]
+                err_msg_counter[_e[2]] += 1
+                err_type_counter[_e[0] or "unknown"] += 1
+                if _e[1]:
+                    err_tool_counter[_e[1]] += 1
+                err_by_model.setdefault(_mdl, Counter())[_e[2]] += 1
+                if _sid:
+                    err_by_session.setdefault(_sid, Counter())[_e[2]] += 1
+                if _dk:
+                    err_by_day.setdefault(_dk, Counter())[_e[2]] += 1
+        requests = list(arch_recs.values())
+        # 会话级合并：credit 单调取 max；title 当前优先；first_date 取更早
+        asj = os.path.join(ARCHIVE_DIR, "sessions.json")
+        arch_sess = {}
+        if os.path.exists(asj):
+            try:
+                arch_sess = json.load(open(asj, encoding="utf-8"))
+            except Exception:
+                arch_sess = {}
+        for sid, ent in arch_sess.items():
+            if sid not in sess_meta and ent.get("title"):
+                sess_meta[sid] = {"title": ent["title"]}
+            cur_cr = sess_credit.get(sid, {}).get("credit", 0.0)
+            if (ent.get("credit") or 0) > cur_cr:
+                sess_credit[sid] = {"credit": ent["credit"]}
+            fd_a = ent.get("first_date") or ""
+            if fd_a and (sid not in sess_first or fd_a < sess_first[sid]):
+                sess_first[sid] = fd_a
+        with open(aj + ".tmp", "w", encoding="utf-8") as fh:
+            for o in arch_recs.values():
+                fh.write(json.dumps(o, ensure_ascii=False) + "\n")
+        os.replace(aj + ".tmp", aj)
+        cur_sess = {}
+        for r in requests:
+            sid = r.get("session_id") or ""
+            if not sid:
+                continue
+            cur_sess[sid] = {
+                "title": (sess_meta.get(sid, {}) or {}).get("title", ""),
+                "credit": sess_credit.get(sid, {}).get("credit", 0.0),
+                "first_date": sess_first.get(sid, ""),
+            }
+        merged_sess = dict(arch_sess)
+        for sid, ent in cur_sess.items():
+            old = merged_sess.get(sid, {})
+            _fds = [x for x in (ent.get("first_date"), old.get("first_date")) if x]
+            merged_sess[sid] = {
+                "title": ent.get("title") or old.get("title", ""),
+                "credit": max(ent.get("credit") or 0.0, old.get("credit") or 0.0),
+                "first_date": (min(_fds) if _fds else ""),
+            }
+        with open(asj + ".tmp", "w", encoding="utf-8") as fh:
+            json.dump(merged_sess, fh, ensure_ascii=False)
+        os.replace(asj + ".tmp", asj)
+        print(f"[2.7.5] 归档合并：原归档 {len(arch_recs) - len(new_from_live)} + 本次新增 {len(new_from_live)} = 合计 {len(arch_recs)} 条"
+              f"（其中 {len(archived_only)} 条的 trace 已被清理，靠归档保留）", flush=True)
+    except Exception as e:
+        print("[2.7.5] 归档合并失败（跳过，不影响本次输出）:", e, flush=True)
+        archived_only = []
+
+print("[2.8] 轮次扩展：提问原文（jsonl）+ 缓存口径 + 调用明细 ...", flush=True)
+sess_prompt = {}
+need_sids = {r["session_id"] for r in requests if r["session_id"] and not r.get("q")}
+proj_dir = os.path.join(HOME, "projects")
+if os.path.isdir(proj_dir) and need_sids:
+    cand = []
+    for root, dirs, fs in os.walk(proj_dir):
+        for fn in fs:
+            base, ext = os.path.splitext(fn)
+            if ext == ".jsonl" and base in need_sids:
+                cand.append(os.path.join(root, fn))
+    for fp in cand:
+        sid = os.path.splitext(os.path.basename(fp))[0]
+        items = []
+        try:
+            with open(fp, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if "<user_query>" not in line or '"role":"user"' not in line:
+                        continue
+                    try:
+                        o = json.loads(line)
+                    except Exception:
+                        continue
+                    txt = o.get("content")
+                    parts = []
+                    if isinstance(txt, list):
+                        for c in txt:
+                            if isinstance(c, dict):
+                                t2 = c.get("text") or ""
+                                if isinstance(t2, str):
+                                    parts.append(t2)
+                    elif isinstance(txt, str):
+                        parts.append(txt)
+                    full = "\n".join(parts)
+                    m = re.search(r"<user_query>(.*?)</user_query>", full, re.S)
+                    if not m:
+                        continue
+                    q = m.group(1).strip()
+                    if not q:
+                        continue
+                    try:
+                        ts2 = int(o.get("timestamp") or 0)
+                    except Exception:
+                        ts2 = 0
+                    if ts2:
+                        items.append((ts2, q[:300]))
+        except Exception:
+            continue
+        if items:
+            items.sort()
+            sess_prompt[sid] = items
+print(f"  提问原文：{len(sess_prompt)}/{len(need_sids)} 个会话命中。", flush=True)
+
+for r in requests:
+    if r.get("session_id") not in sess_prompt:
+        continue
+    items = sess_prompt[r["session_id"]]
+    q = ""
+    if items and r.get("started_at"):
+        lo, hi = 0, len(items) - 1
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if items[mid][0] <= r["started_at"]:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        if hi >= 0:
+            q = items[hi][1]
+    r["q"] = q
+
+_cache_denom_inclusive = not any(r["cached"] > r["input"] for r in requests)
+cache_model_map = {}
+for r in requests:
+    cm = cache_model_map.setdefault(r["model"], {"model": r["model"], "cached": 0, "input": 0, "calls": 0})
+    cm["cached"] += r["cached"]
+    cm["input"] += r["input"]
+    cm["calls"] += 1
+cache_model = []
+for cm in cache_model_map.values():
+    if cm["calls"] < 10:
+        continue
+    _den = cm["input"] if _cache_denom_inclusive else (cm["input"] + cm["cached"])
+    cm["rate"] = round(cm["cached"] / _den * 100.0, 1) if _den else None
+    cache_model.append(cm)
+cache_model.sort(key=lambda x: (x["cached"] or 0), reverse=True)
+
+_total_input_all = sum(r["input"] for r in requests)
+_total_cached_all = sum(r["cached"] for r in requests)
+_den_all = _total_input_all if _cache_denom_inclusive else (_total_input_all + _total_cached_all)
+overall_cache_rate = round(_total_cached_all / _den_all * 100.0, 1) if _den_all else None
+cache_caliber = "cached/in" if _cache_denom_inclusive else "cached/(in+cached)"
+print(f"  缓存命中率（{cache_caliber}）：{overall_cache_rate}%", flush=True)
+
+requests_full = []
+for r in requests:
+    requests_full.append({
+        "sid": r["session_id"] or "",
+        "ts": int(r["started_at"] / 1000) if r["started_at"] else 0,
+        "date": r["date"],
+        "dur": int(r["duration_ms"] / 1000),
+        "st": r["status"],
+        "tk": r["tokens"],
+        "inp": r["input"],
+        "out": r["output"],
+        "ca": r["cached"],
+        "calls": r["calls"],
+        "model": r["model"],
+        "think": r["thinking_sec"],
+        "tools": r["tool_count"],
+        "errs": r["errors"],
+        "gen_n": r.get("gen_n", 0),
+        "gen_ms": int(r.get("gen_ms", 0)),
+        "tl": r.get("tl", []),
+        "el": r.get("el", []),
+        "q": r.get("q", ""),
+    })
+sessions_map = {sid: (m.get("title") or "")[:60] for sid, m in sess_meta.items()}
+
+
 print("[3/4] 聚合指标 ...", flush=True)
 days = sorted(by_day.keys())
 day_list = []
@@ -556,6 +790,55 @@ for sb in by_session.values():
         by_day[fd]["credit"] += cr
     sess_list.append(sb)
 sess_list.sort(key=lambda x: x["tokens"], reverse=True)
+
+# ---------- 每日总量覆盖层（持久化于归档 + --seed 导入，每次运行自动应用） ----------
+restored_days, corrected_days = [], []
+overlay_path = os.path.join(ARCHIVE_DIR, "daily_overlay.json")
+daily_overlay = {}
+if not args.no_archive:
+    try:
+        if os.path.exists(overlay_path):
+            daily_overlay = json.load(open(overlay_path, encoding="utf-8"))
+    except Exception:
+        daily_overlay = {}
+    if args.seed and os.path.exists(args.seed):
+        try:
+            seed_days = {}
+            if args.seed.lower().endswith(".html"):
+                _h = open(args.seed, "r", encoding="utf-8").read()
+                _m = re.search(r"window\.USAGE_STATUS = (\{.*?\});</script>", _h, re.S)
+                if _m:
+                    seed_days = {d["date"]: d for d in json.loads(_m.group(1)).get("by_day", []) if d.get("date")}
+            else:
+                _j = json.load(open(args.seed, encoding="utf-8"))
+                seed_days = {d["date"]: d for d in _j.get("by_day", []) if d.get("date")}
+            for d, srow in seed_days.items():
+                cur_o = daily_overlay.get(d)
+                if (cur_o is None) or (srow.get("tokens", 0) > cur_o.get("tokens", 0)):
+                    daily_overlay[d] = srow
+            with open(overlay_path + ".tmp", "w", encoding="utf-8") as fh:
+                json.dump(daily_overlay, fh, ensure_ascii=False)
+            os.replace(overlay_path + ".tmp", overlay_path)
+            print(f"  种子导入：合并 {len(seed_days)} 天进入每日覆盖层（现共 {len(daily_overlay)} 天）", flush=True)
+        except Exception as e:
+            print("  种子导入失败（跳过）:", e, flush=True)
+    if daily_overlay:
+        for d, srow in daily_overlay.items():
+            cur = by_day.get(d)
+            if cur is None:
+                row = {k: srow.get(k, 0) for k in ("requests", "tokens", "input", "output", "cached", "thinking_sec", "credit", "errors", "sessions")}
+                row["date"] = d
+                by_day[d] = row
+                restored_days.append(d)
+            elif srow.get("tokens", 0) > cur.get("tokens", 0):
+                for k in ("requests", "tokens", "input", "output", "cached", "thinking_sec", "credit", "errors", "sessions"):
+                    if k in srow:
+                        cur[k] = srow[k]
+                corrected_days.append(d)
+        if restored_days or corrected_days:
+            day_list[:] = [by_day[k] for k in sorted(by_day.keys())]
+            print(f"  每日覆盖层应用：恢复 {len(restored_days)} 天、修正 {len(corrected_days)} 天", flush=True)
+_valid_days = [k for k in by_day if re.match(r"^\d{4}-\d{2}-\d{2}$", k)]
 
 
 
@@ -823,7 +1106,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.3.3",
+    "version": "1.4.0",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -833,6 +1116,8 @@ summary = {
     "total_input": total_input,
     "total_output": total_output,
     "total_cached": total_cached,
+    "cache_rate": overall_cache_rate,
+    "cache_caliber": cache_caliber,
     "total_thinking_sec": total_thinking,
     "total_thinking_hours": round(total_thinking / 3600.0, 2),
     "avg_thinking_sec_per_request": round(total_thinking / len(requests), 1) if requests else 0,
@@ -841,8 +1126,8 @@ summary = {
     "top_error_msg": (error_top_messages[0]["msg"] if error_top_messages else ""),
     "top_error_pct": (round(error_top_messages[0]["count"] / total_errors * 100, 1) if total_errors else 0.0),
     "avg_efficiency_tok_per_sec": round(total_output / total_thinking, 1) if total_thinking else 0,
-    "date_min": min(dates) if dates else None,
-    "date_max": max(dates) if dates else None,
+    "date_min": (min(_valid_days) if _valid_days else (min(dates) if dates else None)),
+    "date_max": (max(_valid_days) if _valid_days else (max(dates) if dates else None)),
     "credit_xlsx_date_min": xlsx_date_min,
     "credit_xlsx_date_max": xlsx_date_max,
     "billing_date_min": billing_date_min,
@@ -874,6 +1159,9 @@ out = {
     "model_tips": model_tips,
     "spike_days": spike_days,
     "error_detail": error_detail,
+    "cache_model": cache_model,
+    "requests_full": requests_full,
+    "sessions_map": sessions_map,
 }
 
 
@@ -884,6 +1172,7 @@ if skipped_trace_files:
     warnings.append({
         "type": "skipped_traces",
         "count": len(skipped_trace_files),
+        "names": names + more,
         "detail": f"已跳过 {len(skipped_trace_files)} 个损坏/无法解析的 trace 文件（报告可能不完整）：{names}{more}",
     })
 if bad_credit_sessions:
@@ -891,6 +1180,35 @@ if bad_credit_sessions:
         "type": "bad_credit",
         "count": bad_credit_sessions,
         "detail": f"{bad_credit_sessions} 个会话的 credit_json 解析失败，相关会话 credit 计为 0（不影响 token 与每日趋势）。",
+    })
+if args.seed and (restored_days or corrected_days):
+    warnings.append({
+        "type": "seed_restore",
+        "count": len(restored_days) + len(corrected_days),
+        "restored": len(restored_days),
+        "corrected": len(corrected_days),
+        "detail": f"已从旧快照恢复 {len(restored_days)} 天、修正 {len(corrected_days)} 天的每日总量；这些天的部分逐笔明细因 WorkBuddy 30 天 trace 清理不可恢复。",
+    })
+if (not archive_existed) and (not args.no_archive):
+    warnings.append({
+        "type": "archive_first_run",
+        "count": 1,
+        "detail": "本次运行已建立本地归档（~/.workbuddy/usage-archive）。WorkBuddy 对 trace 仅保留 30 天——请至少每 30 天运行一次本技能（建议配置每日定时自动化），断档超 30 天期间的 trace 将无法追溯。",
+    })
+_orphan_credit, _orphan_sessions = 0.0, 0
+for sid, ent in sess_credit.items():
+    if sid in by_session:
+        continue
+    _cr = ent.get("credit", 0) or 0
+    if _cr:
+        _orphan_sessions += 1
+        _orphan_credit += _cr
+if _orphan_credit > 0.5:
+    warnings.append({
+        "type": "orphan_credit",
+        "count": _orphan_sessions,
+        "amount": round(_orphan_credit, 2),
+        "detail": f"另有 {_orphan_sessions} 个历史会话的 credit 合计 {round(_orphan_credit, 2)}，其逐笔明细已不在本地，未在每日趋势中逐日展示。",
     })
 out["warnings"] = warnings
 
@@ -936,6 +1254,104 @@ try:
     print("已生成看板 HTML（chart.js 外链，需与 chart.umd.min.js 同目录存放）:", OUT_HTML)
 except Exception as e:
     print("HTML 生成跳过:", e)
+
+# ---------- CSV 表头语言：自动跟随操作系统界面语言（零开关） ----------
+def _detect_lang():
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            _lid = int(ctypes.windll.kernel32.GetUserDefaultUILanguage())
+            return "zh" if (_lid & 0x3FF) == 0x04 else "en"
+    except Exception:
+        pass
+    try:
+        import locale as _loc
+        _l = _loc.getlocale()[0] or ""
+        if _l:
+            return "zh" if _l.lower().startswith("zh") else "en"
+    except Exception:
+        pass
+    return "zh"
+
+_CSV_LABELS = {
+    "zh": {
+        "title": "# WorkBuddy 用量全量导出（生成时间 {ts}）",
+        "caliber": "# 缓存命中率口径: {c}",
+        "sec_daily": "## 每日汇总", "sec_model": "## 按模型", "sec_sessions": "## 会话清单（前200）", "sec_calls": "## 调用明细",
+        "sec_err_top": "## 错误-高频", "sec_err_type": "## 错误-按类型", "sec_err_tool": "## 错误-按工具",
+        "sec_err_model": "## 错误-按模型", "sec_err_sess": "## 错误-按会话", "sec_err_samples": "## 错误-近期样本",
+        "date": "日期", "reqs": "请求数", "token": "Token", "input": "输入", "output": "输出", "cache": "缓存命中",
+        "think_sec": "思考秒", "credit": "credit", "errors": "错误", "sessions": "会话数",
+        "model": "模型", "calls_n": "调用数", "eff": "效率tok/s", "session": "会话", "title_c": "标题",
+        "think_min": "思考(分)", "status": "状态", "first_date": "首现日期",
+        "time": "时间", "duration": "时长秒", "tools": "工具数", "prompt": "提问",
+        "msg": "错误信息", "count": "次数", "share": "占比", "type": "类型", "tool": "工具", "top_err": "最高频错误",
+    },
+    "en": {
+        "title": "# WorkBuddy usage full export (generated at {ts})",
+        "caliber": "# Cache-hit caliber: {c}",
+        "sec_daily": "## Daily summary", "sec_model": "## By model", "sec_sessions": "## Sessions (top 200)", "sec_calls": "## Call details",
+        "sec_err_top": "## Errors - top", "sec_err_type": "## Errors - by type", "sec_err_tool": "## Errors - by tool",
+        "sec_err_model": "## Errors - by model", "sec_err_sess": "## Errors - by session", "sec_err_samples": "## Errors - recent samples",
+        "date": "Date", "reqs": "Requests", "token": "Tokens", "input": "Input", "output": "Output", "cache": "Cache hit",
+        "think_sec": "Think sec", "credit": "credit", "errors": "Errors", "sessions": "Sessions",
+        "model": "Model", "calls_n": "Calls", "eff": "Eff tok/s", "session": "Session", "title_c": "Title",
+        "think_min": "Think(min)", "status": "Status", "first_date": "First seen",
+        "time": "Time", "duration": "Duration(s)", "tools": "Tools", "prompt": "Prompt",
+        "msg": "Error message", "count": "Count", "share": "Share", "type": "Type", "tool": "Tool", "top_err": "Top error",
+    },
+}
+_csv_lang = _detect_lang()
+CSV_L = _CSV_LABELS[_csv_lang]
+
+# ---------- 全量 CSV 同步输出（内置浏览器无法下载 blob 时直接取文件） ----------
+try:
+    def _csv_cell(v):
+        s2 = "" if v is None else str(v)
+        if re.search(r'[",\r\n]', s2):
+            s2 = '"' + s2.replace('"', '""') + '"'
+        return s2
+    _csv_lines = []
+    def _csv_push(arr):
+        _csv_lines.append(",".join(_csv_cell(x) for x in arr))
+    _csv_push([CSV_L["title"].format(ts=datetime.datetime.now().isoformat(timespec="seconds"))])
+    _csv_push([CSV_L["caliber"].format(c=(summary.get("cache_caliber") or "cached/in"))])
+    _csv_push("")
+    _csv_push([CSV_L["sec_daily"]]); _csv_push([CSV_L["date"],CSV_L["reqs"],CSV_L["token"],CSV_L["input"],CSV_L["output"],CSV_L["cache"],CSV_L["think_sec"],CSV_L["credit"],CSV_L["errors"],CSV_L["sessions"]])
+    for d in day_list:
+        _csv_push([d.get("date"),d.get("requests"),d.get("tokens"),d.get("input"),d.get("output"),d.get("cached"),d.get("thinking_sec"),d.get("credit"),d.get("errors"),d.get("sessions")])
+    _csv_push(""); _csv_push([CSV_L["sec_model"]]); _csv_push([CSV_L["model"],CSV_L["reqs"],CSV_L["token"],CSV_L["input"],CSV_L["output"],CSV_L["calls_n"],CSV_L["think_sec"],CSV_L["errors"],CSV_L["eff"]])
+    for m in (out.get("by_model") or []):
+        _csv_push([m.get("model"),m.get("requests"),m.get("tokens"),m.get("input"),m.get("output"),m.get("calls"),m.get("thinking_sec"),m.get("errors"),m.get("efficiency_tok_per_sec")])
+    _csv_push(""); _csv_push([CSV_L["sec_sessions"]]); _csv_push([CSV_L["session"],CSV_L["title_c"],CSV_L["model"],CSV_L["reqs"],CSV_L["token"],CSV_L["think_min"],CSV_L["credit"],CSV_L["errors"],CSV_L["status"],CSV_L["first_date"]])
+    for x in (out.get("by_session") or []):
+        _th = round(x.get("thinking_sec", 0) / 60, 1) if x.get("thinking_sec") else 0
+        _csv_push([x.get("session_id"),x.get("title"),x.get("model"),x.get("requests"),x.get("tokens"),_th,x.get("credit"),x.get("errors"),x.get("status"),x.get("first_date")])
+    _csv_push(""); _csv_push([CSV_L["sec_calls"]]); _csv_push([CSV_L["date"],CSV_L["time"],CSV_L["session"],CSV_L["model"],CSV_L["status"],CSV_L["token"],CSV_L["input"],CSV_L["output"],CSV_L["cache"],CSV_L["calls_n"],CSV_L["tools"],CSV_L["think_sec"],CSV_L["duration"],CSV_L["errors"],CSV_L["prompt"]])
+    for r in (out.get("requests_full") or []):
+        _ts = datetime.datetime.fromtimestamp(r["ts"]).strftime("%Y-%m-%d %H:%M:%S") if r.get("ts") else ""
+        _csv_push([r.get("date"),_ts,r.get("sid"),r.get("model"),r.get("st"),r.get("tk"),r.get("inp"),r.get("out"),r.get("ca"),r.get("calls"),r.get("tools"),r.get("think"),r.get("dur"),r.get("errs"),r.get("q")])
+    _ed = out.get("error_detail") or {}
+    _csv_push(""); _csv_push([CSV_L["sec_err_top"]]); _csv_push([CSV_L["msg"],CSV_L["count"],CSV_L["share"]])
+    for x in (_ed.get("top_messages") or []):
+        _sh = round(x.get("count", 0) / _ed["total"] * 100, 2) if _ed.get("total") else ""
+        _csv_push([x.get("msg"),x.get("count"),_sh])
+    _csv_push(""); _csv_push([CSV_L["sec_err_type"]]); _csv_push([CSV_L["type"],CSV_L["count"]])
+    for x in (_ed.get("by_type") or []): _csv_push([x.get("type"),x.get("count")])
+    _csv_push(""); _csv_push([CSV_L["sec_err_tool"]]); _csv_push([CSV_L["tool"],CSV_L["count"]])
+    for x in (_ed.get("by_tool") or []): _csv_push([x.get("tool"),x.get("count")])
+    _csv_push(""); _csv_push([CSV_L["sec_err_model"]]); _csv_push([CSV_L["model"],CSV_L["count"],CSV_L["top_err"]])
+    for x in (_ed.get("by_model") or []): _csv_push([x.get("model"),x.get("count"),x.get("top_msg")])
+    _csv_push(""); _csv_push([CSV_L["sec_err_sess"]]); _csv_push([CSV_L["session"],CSV_L["count"],CSV_L["top_err"]])
+    for x in (_ed.get("by_session") or []): _csv_push([x.get("title") or x.get("session_id") or "",x.get("count"),x.get("top_msg")])
+    _csv_push(""); _csv_push([CSV_L["sec_err_samples"]]); _csv_push([CSV_L["date"],CSV_L["session"],CSV_L["model"],CSV_L["tool"],CSV_L["msg"]])
+    for x in (_ed.get("samples") or []): _csv_push([x.get("date"),x.get("session_id"),x.get("model"),x.get("tool"),x.get("msg")])
+    OUT_CSVF = os.path.join(OUT_DIR, "usage-full-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv")
+    with open(OUT_CSVF, "w", encoding="utf-8-sig", newline="") as f:
+        f.write("\r\n".join(_csv_lines))
+    print("已生成全量 CSV:", os.path.basename(OUT_CSVF), f"（表头语言: {_csv_lang}；与看板同目录；内置浏览器无法下载时直接取用）", flush=True)
+except Exception as e:
+    print("全量 CSV 生成失败（不影响看板）:", e, flush=True)
 
 print("\n=== 完成 ===")
 print(f"请求数: {summary['total_requests']}  会话数: {summary['total_sessions']}")
