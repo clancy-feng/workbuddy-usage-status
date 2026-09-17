@@ -27,7 +27,13 @@
 >   
 >   **Not triggered (reverse cases):** This skill does **not** apply when — ① you want usage/stats of *other products* (Cursor, VS Code, Trae, Claude, etc.); ② you only say "export my data / make me a chart / build a dashboard" without specifying *WorkBuddy's local usage*; ③ you want a generic visualization/report from arbitrary datasets. In those cases, tell the user this skill only reads `~/.workbuddy`, not other products or generic data — confirm whether they meant WorkBuddy's own usage, or point them to that product's tool.
 > 
-> - **CLI:** `python3 scripts/usage_extractor.py` (options: `--out ./report`, `--home /other/.workbuddy`, `--credit-xlsx <file>`, `--billing-token-file <file>`, `--seed <old snapshot>`, `--no-archive`). Python 3.10+, standard library only. Windows users please replace `python3` with `python`.
+> - **CLI:**
+>   
+>   ```
+>   python3 scripts/usage_extractor.py
+>   ```
+>   
+>   Options: `--out ./report`, `--home /other/.workbuddy`, `--credit-xlsx <file>`, `--seed <old snapshot>`, `--no-archive`. Python 3.10+, standard library only. Windows users please replace `python3` with `python`. An opt-in official-billing API mode, disabled by default, is documented with security warnings in the Chinese section below.
 > 
 > ⭐ If this dashboard helped you see your WorkBuddy usage clearly, please give it a Star to support independent development: [github.com/clancy-feng/workbuddy-usage-status](https://github.com/clancy-feng/workbuddy-usage-status)
 > 
@@ -115,6 +121,7 @@ python3 scripts/usage_extractor.py --credit-xlsx ~/Downloads/request-usage-2026-
 
 # 可选（手动token注入）：直接调用官方用量 API 拉取精确 credit，无需先导出 xlsx
 # token 文件内容：从浏览器 DevTools 复制的鉴权头（如 `Cookie: ...` 整行，或 `Authorization: Bearer ...`）
+# 本参数只传本地文件路径；凭证本体保存在文件内、不会出现在命令行参数中。用后请删除该文件，或在 workbuddy.cn 退出登录使其失效
 python3 scripts/usage_extractor.py --billing-token-file ~/Desktop/workbuddy-auth.txt
 
 # 可选：用旧快照（usage-status.json 或历史 dashboard HTML）恢复已被 30 天清理的日期的每日总量
@@ -130,13 +137,15 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 
 脚本在「输出目录」（即你运行命令时所在目录，或 `--out` 指定的目录）生成 5 个文件：
 
-| 文件                                            | 说明                                                             |
+| 文件 | 说明 |
 | --------------------------------------------- | -------------------------------------------------------------- |
-| `workbuddy-usage-status-dashboard-<时间戳>.html` | 生成的报告文件，文件名带生成时间戳，每次生成独立文件，可保留多份对比                             |
-| `usage-status.json`                           | 聚合后的原始数据，可二次处理                                                 |
-| `usage-status.js`                             | `window.USAGE_STATUS = {...}`，备用                               |
-| `chart.umd.min.js`                            | 图表引擎文件，由脚本自动复制到输出目录，需与 HTML 同目录存放                              |
-| `usage-full-<时间戳>.csv`                        | 全量数据 CSV（每日汇总 / 按模型 / 会话清单 / 调用明细 / 错误分区），与看板同源；内置浏览器无法下载时直接取用 |
+| `workbuddy-usage-status-dashboard-<时间戳>.html` | 生成的报告文件，文件名带生成时间戳，每次生成独立文件，可保留多份对比 |
+| `usage-status.json` | 聚合后的原始数据，可二次处理 |
+| `usage-status.js` | `window.USAGE_STATUS = {...}`，备用 |
+| `chart.umd.min.js` | 图表引擎文件，由脚本自动复制到输出目录，需与 HTML 同目录存放 |
+| `usage-full-<时间戳>.csv` | 全量数据 CSV（每日汇总 / 按模型 / 会话清单 / 调用明细 / 错误分区），与看板同源；内置浏览器无法下载时直接取用 |
+
+> ⚠ **产物敏感性提醒**：`usage-status.json` / `usage-status.js` / dashboard HTML / 全量 CSV 中均含**会话标题与用户提问原文摘要**（提问最长 300 字；看板内展示默认脱敏，数据文件内为原文截断），分享或提交到仓库前请先检查敏感性。
 
 打开最新生成的 `workbuddy-usage-status-dashboard-*.html` 即可看到：KPI 卡 + 每日积分消耗（credit）图 + 每日思考用时图 + 各模型 Token 占比 + 模型效率 + 效率散点 + Top 10 Token消耗会话表 + 每日错误。四张时序图的横轴会按所选日期范围的跨度自动在「日 / 周 / 月」之间切换（≤120 天按日，120–730 天按周，>730 天按月），日期选择在修改起止日期后看板立即刷新。
 
@@ -240,14 +249,14 @@ python3 scripts/usage_extractor.py --out ./report
 
 ## 5. 指标来源及算法（详见 DATA-GUIDE.md）
 
-| 指标        | 算法                                                                                                          | 数据来源                        |
+| 指标 | 算法 | 数据来源 |
 | --------- | ----------------------------------------------------------------------------------------------------------- | --------------------------- |
-| 思考用时      | 每条 trace 里 `type=generation` 的 span 时长之和                                                                    | `traces/*/trace_*.json`     |
-| 思考效率      | 输出 token ÷ 思考秒数（tok/s）                                                                                      | `traces/*/trace_*.json`     |
-| token 消耗  | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合                                                                           | `traces/*/trace_*.json`     |
-| 缓存命中率     | `totalCachedTokens ÷ totalInputTokens`（若实测 cached>input 自动切换为 `cached/(in+cached)`），按天/模型聚合；模型排行仅收录调用数 ≥ 10 | `traces/*/trace_*.json`     |
-| credit 消耗 | `session_usage.credit_json` 会话级汇总；看板默认归到会话首次出现日；提供用量导出 xlsx 精确分析。                                           | `workbuddy.db`              |
-| Top 会话    | 按 token 消耗降序取前 10 个会话，列出标题/token/思考时长/credit/错误数                                                            | `traces/*` + `workbuddy.db` |
+| 思考用时 | 每条 trace 里 `type=generation` 的 span 时长之和 | `traces/*/trace_*.json` |
+| 思考效率 | 输出 token ÷ 思考秒数（tok/s） | `traces/*/trace_*.json` |
+| token 消耗 | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合 | `traces/*/trace_*.json` |
+| 缓存命中率 | `totalCachedTokens ÷ totalInputTokens`（若实测 cached>input 自动切换为 `cached/(in+cached)`），按天/模型聚合；模型排行仅收录调用数 ≥ 10 | `traces/*/trace_*.json` |
+| credit 消耗 | `session_usage.credit_json` 会话级汇总；看板默认归到会话首次出现日；提供用量导出 xlsx 精确分析。 | `workbuddy.db` |
+| Top 会话 | 按 token 消耗降序取前 10 个会话，列出标题/token/思考时长/credit/错误数 | `traces/*` + `workbuddy.db` |
 
 ---
 
@@ -268,11 +277,11 @@ python3 scripts/usage_extractor.py --out ./report
 
 ## 7. 故障排查
 
-| 现象                | 原因 / 处理                                                             |
+| 现象 | 原因 / 处理 |
 | ----------------- | ------------------------------------------------------------------- |
-| 打开 HTML 显示"数据未加载" | 脚本报错中断。重跑 `usage_extractor.py` 看 stderr                             |
-| 图表空白但数字在          | 若报错"缺少 chart.umd.min.js"，确认该文件与 usage_extractor.py 同在 scripts/ 下后重跑 |
-| 数据明显偏少            | 这台机器 traces 少/刚装；或 `--home` 指错了目录                                   |
+| 打开 HTML 显示"数据未加载" | 脚本报错中断。重跑 `usage_extractor.py` 看 stderr |
+| 图表空白但数字在 | 若报错"缺少 chart.umd.min.js"，确认该文件与 usage_extractor.py 同在 scripts/ 下后重跑 |
+| 数据明显偏少 | 这台机器 traces 少/刚装；或 `--home` 指错了目录 |
 
 ---
 
@@ -280,7 +289,7 @@ python3 scripts/usage_extractor.py --out ./report
 
 **Q：看板里的数字和 WorkBuddy 自己显示的对不上？**
 
-A：本看板只读 `~/.workbuddy` 下的本地数据（traces + workbuddy.db），与 WorkBuddy 自身统计口径可能不同——本工具只统计「有 token 消耗的请求」，排除零用量的工作流记账噪声。以本看板口径为准，详见 DATA-GUIDE.md。
+A：本看板只读取 `~/.workbuddy` 下的本地数据文件（traces + workbuddy.db + projects 提问摘要），与 WorkBuddy 自身统计口径可能不同——本工具只统计「有 token 消耗的请求」，排除零用量的工作流记账噪声。以本看板口径为准，详见 DATA-GUIDE.md。
 
 **Q：为什么某天 credit 特别高、相邻几天却是 0？**
 
@@ -322,7 +331,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.4.0（2026-09-16）
+当前最新版本：v1.4.1（2026-09-17）
 
 ---
 

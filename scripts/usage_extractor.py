@@ -3,12 +3,20 @@
 """
 WorkBuddy 本地 usage-status 抽取器
 （面向中文 WorkBuddy 用户 zh-CN 设计；英文能力说明见 SKILL.md 的 description EN 段）
-读取 ~/.workbuddy 下的:
+
+读取（全部只读 mode=ro）~/.workbuddy 下：
   - workbuddy.db  (sessions + session_usage: token预算/上下文上限/credit消耗)
   - traces/*/trace_*.json  (每次请求的时长/token拆分/思考用时/模型/工具调用/错误)
-输出:
-  - usage-status.json   原始聚合数据
-  - usage-status.js     window.USAGE_STATUS = {...}  (供 HTML 直接 <script> 引入, 避开 file:// 的 fetch 跨域限制)
+  - projects/*/*.jsonl  (仅按 sessionId 提取 <user_query> 提问摘要，供看板下钻的提问列)
+
+写入：
+  - 输出目录：usage-status.json（原始聚合数据）、usage-status.js（window.USAGE_STATUS = {...}，
+    供 HTML 直接 <script> 引入以避开 file:// 的 fetch 跨域限制）、dashboard HTML、chart.umd.min.js、
+    usage-full-<时间戳>.csv
+  - ~/.workbuddy/usage-archive/：逐请求归档 + 会话汇总 + 每日总量覆盖层（traceId 去重；--no-archive 关闭）
+
+网络：
+  - 默认零外部请求；仅当显式传入 --billing-token-file 时向官方用量 API 发起一次 HTTPS 请求
 """
 import sqlite3, json, os, glob, datetime, sys, argparse, shutil, re
 import urllib.request, ssl
@@ -1106,7 +1114,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.4.0",
+    "version": "1.4.1",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -1238,8 +1246,8 @@ try:
     else:
         sys.exit("错误：缺少随包文件 chart.umd.min.js，无法生成离线 HTML。\n"
                  "请确认该文件与 usage_extractor.py 同在 scripts/ 目录下。")
-    if "<!--CHART_JS-->" in tpl:
-        tpl = tpl.replace("<!--CHART_JS-->", chart_tag)
+    if "<!--CHART_JS_ASSET_TAG-->" in tpl:
+        tpl = tpl.replace("<!--CHART_JS_ASSET_TAG-->", chart_tag)
 
     
     

@@ -2,11 +2,19 @@
 name: "workbuddy-usage-status"
 slug: workbuddy-usage-status
 displayName: "WorkBuddy 使用状态看板"
-version: 1.4.0
+version: 1.4.1
 description: "离线可视化 WorkBuddy 本机使用数据，以 token 消耗为主指标、credit 为本地估算，涵盖思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查，生成本地使用信息看板。仅当用户**明确**想查看、生成或导出**自己 WorkBuddy 本机/本账号**的使用状态 / 使用统计 / 工作信息看板时调用；不用于其他产品或系统的用量统计，也不为任意数据生成通用看板。纯本地、默认零外网依赖、可搬运；可选 --credit-xlsx 用用量导出精确覆盖 credit，或可选 --billing-token-file（用户手动导出 token，opt-in）调用官方用量 API 拉取精确 credit。 EN: Offline dashboard for WorkBuddy local usage analytics, with token as primary metric and credit as local estimate, covering thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection. Triggers only when the user explicitly wants to view, generate, or export their own WorkBuddy local/account usage status / stats / activity dashboard; not for other products' usage analytics, nor for building generic dashboards from arbitrary data. Fully local, default zero-network; optionally --billing-token-file (user-supplied token, opt-in) calls the official usage API for precise credit, or --credit-xlsx overrides credit with precise export values."
 agent_created: true
 license: MIT
 summary: "离线可视化 WorkBuddy 本机使用数据，以 token 消耗为主指标、credit 为本地估算，涵盖思考效率、模型分布与性价比、日期区间筛选、错误监控、用量高峰探查，生成本地使用信息看板。仅当用户**明确**想查看、生成或导出**自己 WorkBuddy 本机/本账号**的使用状态 / 使用统计 / 工作信息看板时调用；不用于其他产品或系统的用量统计，也不为任意数据生成通用看板。纯本地、默认零外网依赖、可搬运；可选 --credit-xlsx 用用量导出精确覆盖 credit，或可选 --billing-token-file（用户手动导出 token，opt-in）调用官方用量 API 拉取精确 credit。 EN: Offline dashboard for WorkBuddy local usage analytics, with token as primary metric and credit as local estimate, covering thinking efficiency, model distribution & cost-performance, date-range filtering, error monitoring, usage-spike inspection. Triggers only when the user explicitly wants to view, generate, or export their own WorkBuddy local/account usage status / stats / activity dashboard; not for other products' usage analytics, nor for building generic dashboards from arbitrary data. Fully local, default zero-network; optionally --billing-token-file (user-supplied token, opt-in) calls the official usage API for precise credit, or --credit-xlsx overrides credit with precise export values."
+trigger:
+  - 查看 WorkBuddy 使用状态
+  - 生成 WorkBuddy 用量看板
+  - 导出 WorkBuddy 用量数据
+  - WorkBuddy token 消耗统计
+  - WorkBuddy 积分消耗 / 对账
+  - WorkBuddy 模型分布与性价比
+  - WorkBuddy 用量高峰 / 错误监控
 allowed-tools: python3, read_file, write_file
 permissions:
 
@@ -75,11 +83,13 @@ permissions:
 - 关心 token 消耗、模型分布与性价比、思考效率、错误监控、用量高峰日等任一维度在 WorkBuddy 本机 trace 中的数据；
 - 想对账某段时间 WorkBuddy 用了多少积分（credit）。
 
+典型触发说法（示例，非穷举）：「看看我的 WorkBuddy 用了多少 token」「生成 WorkBuddy 用量看板」「WorkBuddy 积分消耗对账」「哪个模型最划算」「哪天用量最高」。命中任一具体说法即触发；只有泛指「做个统计图表」且未指向 WorkBuddy 本机用量时不易触发。
+
 **反向触发词**：用户意图指向以下任一情况时，本技能不适用，应直接告知用户而非静默跳过：
 
 - 想查看 / 统计**其他产品**（如 Cursor、VS Code、Trae、Claude 等任意第三方系统）的用量、数据、分析；
 - 仅泛指"导出我的数据 / 做个统计图表 / 生成看板"，未明确指向 WorkBuddy 本机用量；
-- 想为任意数据集生成通用可视化 / 报表；本技能只读 `~/.workbuddy`，不具备通用图表能力。
+- 想为任意数据集生成通用可视化 / 报表；本技能只读取 `~/.workbuddy` 下的数据文件，不具备通用图表能力。
 
 遇到上述情况，回复要点：本技能只读取并可视化 WorkBuddy 本机（`~/.workbuddy`）的使用数据，不涉及其他产品或通用数据；请确认是否要分析 WorkBuddy 自身用量，或改用对应产品的工具。
 
@@ -97,7 +107,7 @@ python3 scripts/usage_extractor.py [--out <输出目录>] [--home <数据根>] [
 
 - `--credit-xlsx <path>`：传入从 `workbuddy.cn` 用量页导出的 xlsx，用服务端精确 credit 覆盖对应日期窗口；用于"查清某月精确花费/对账"。默认不主动使用，仅当用户明确要求精确 credit 时再加。
 
-- `--billing-token-file <path>`：Path A（opt-in，默认关闭）。用户从自己浏览器 DevTools 手动复制用量 API 的鉴权头（如 `Cookie: ...` 整行，或 `Authorization: Bearer ...`）存入本地文件后传入，skill 以该 token 调用官方用量 API（`/billing/meter/get-user-request-usage`）拉取逐请求精确 credit，效果同 `--credit-xlsx` 但无需先导出 xlsx。**token 必须由用户显式提供，skill 绝不自动读取宿主 App 凭据存储**；不传此参数时零网络。详见 README「精确化 credit（可选）」与 `CHANGELOG.md` 安全等级评估。
+- `--billing-token-file <path>`：Path A（opt-in，默认关闭）。用户从自己浏览器 DevTools 手动复制用量 API 的鉴权头（如 `Cookie: ...` 整行，或 `Authorization: Bearer ...`）存入本地文件后传入，skill 以该 token 调用官方用量 API（`/billing/meter/get-user-request-usage`）拉取逐请求精确 credit，效果同 `--credit-xlsx` 但无需先导出 xlsx。**token 必须由用户显式提供，skill 绝不自动读取宿主 App 凭据存储**；不传此参数时零网络。详见 README「精确化 credit（可选）」与 `CHANGELOG.md` 安全等级评估。该参数只传**本地文件路径**；凭证本体保存在该文件内，不会出现在命令行参数中。
 
 - `--seed <path>`：旧快照种子（`usage-status.json` 或历史 dashboard HTML）。一次性导入其每日总量进入持久覆盖层，恢复已被 WorkBuddy 30 天清理的日期（逐笔明细不可追溯）。导入后持久生效，无需重复传入。
 
@@ -113,6 +123,8 @@ python3 scripts/usage_extractor.py [--out <输出目录>] [--home <数据根>] [
 - `chart.umd.min.js` —— 图表引擎，由抽取器从 skill 包复制到输出目录，需与 HTML 同目录存放。
 - `usage-full-<时间戳>.csv` —— 全量数据 CSV（每日汇总 / 按模型 / 会话清单 / 调用明细 / 错误分区），与看板同源；内置浏览器无法下载 CSV 时直接取用此文件。
 
+> ⚠ **产物敏感性提醒**：`usage-status.json` / `usage-status.js` / dashboard HTML / 全量 CSV 中均含**会话标题与用户提问原文摘要**（提问最长 300 字；看板内展示默认脱敏，数据文件内为原文截断），分享或提交到仓库前请先检查敏感性。
+
 > ⚠ **30 天缓存期（重要）**：WorkBuddy 现对本机 traces 只保留 **30 天**，本 skill 每次运行会自动把数据归档到 `~/.workbuddy/usage-archive/`，之后无论 trace 是否被清理，看板始终是全量视图——**但归档只在运行时发生**，所以需至少每 30 天运行一次，建议设置自动任务，断档超 30 天期间的 trace 无法追溯；首次运行只能看到最近 30 天。可用 `--seed <旧快照>` 导入历史快照恢复更早的每日总量。
 
 ## 交付方式
@@ -121,7 +133,7 @@ python3 scripts/usage_extractor.py [--out <输出目录>] [--home <数据根>] [
 
 ## 约束与口径
 
-- 只读不写：仅以只读模式读 `~/.workbuddy` 下的 `workbuddy.db` 与 `traces/`，只读参数固定为 mode=ro；不修改 WorkBuddy 自身数据、不上传任何数据、不读取任何 API key/密码。默认零外部请求；**仅当用户显式传入 `--billing-token-file` 时**才向官方用量 API（`workbuddy.cn`）发起一次出站 HTTPS 请求，且鉴权凭据由用户提供（绝不自动读取宿主 App 凭据存储）。不传该参数时完全离线。
+- 读写与网络边界：① **读**——仅以只读模式读 `~/.workbuddy` 下的 `workbuddy.db`、`traces/`、`projects/*/*.jsonl`（仅提取 `<user_query>` 提问摘要供下钻显示），不修改 WorkBuddy 自身数据、不上传任何数据、不读取任何 API key/密码；② **写**——仅在输出目录生成 5 个产物文件，并在 `~/.workbuddy/usage-archive/` 维护本地归档以对抗 30 天 trace 清理（`--no-archive` 可关闭）；③ **网络**——默认零外部请求，**仅当用户显式传入 `--billing-token-file` 时**才向官方用量 API（`workbuddy.cn`）发起一次出站 HTTPS 请求，且鉴权凭据由用户提供（绝不自动读取宿主 App 凭据存储）；不传该参数时完全离线。
 - 指标口径：token 为权威主指标，本地 trace 带精确时间戳，按请求本地时区归日，精确；credit 为会话级估算，本地无逐日时间戳，按归首日近似，非精确值，精确值只能由 `--credit-xlsx` 给出。各指标的具体算法、聚合口径与已知限制见 `DATA-GUIDE.md`，不要凭空编造数字。
 - 数据完整性：抽取器顶部警告条已列出被跳过/解析失败的 trace 与会话，报告可能不完整属正常现象，如实告知用户即可。
 - 产物确定：每次运行仅生成上述 5 个固定文件（dashboard HTML / `usage-status.json` / `usage-status.js` / `chart.umd.min.js` / `usage-full-<时间戳>.csv`），规模由本地 `~/.workbuddy` 数据量天然限定，不存在无界输出。
