@@ -7,19 +7,19 @@ WorkBuddy 本地 usage-status 抽取器
 读取（全部只读 mode=ro）~/.workbuddy 下：
   - workbuddy.db  (sessions + session_usage: token预算/上下文上限/credit消耗)
   - traces/*/trace_*.json  (每次请求的时长/token拆分/思考用时/模型/工具调用/错误)
-  - projects/*/*.jsonl  (仅按 sessionId 提取 <user_query> 提问摘要，供看板下钻的提问列)
+  - projects/*/*.jsonl  (每行的 providerData：提问摘要 <user_query>，以及该次模型调用的
+    模型名与精确 credit，用于把 credit 逐次归到真实日期、真实模型)
 
 写入：
   - 输出目录：usage-status.json（原始聚合数据）、usage-status.js（window.USAGE_STATUS = {...}，
     供 HTML 直接 <script> 引入以避开 file:// 的 fetch 跨域限制）、dashboard HTML、chart.umd.min.js、
-    usage-full-<时间戳>.csv
+    usage-full-<时间戳>.csv 与 usage-full-<时间戳>.xlsx（同源；CSV 每行的分区在 xlsx 里对应一个工作表）
   - ~/.workbuddy/usage-archive/：逐请求归档 + 会话汇总 + 每日总量覆盖层（traceId 去重；--no-archive 关闭）
 
 网络：
-  - 默认零外部请求；仅当显式传入 --billing-token-file 时向官方用量 API 发起一次 HTTPS 请求
+  - 全程零网络请求，不读取宿主 App 的任何凭据
 """
 import sqlite3, json, os, glob, datetime, sys, argparse, shutil, re
-import urllib.request, ssl
 from collections import Counter, defaultdict
 
 HOME = os.path.expanduser("~/.workbuddy")
@@ -55,13 +55,8 @@ parser.add_argument("--out", default=os.getcwd(),
 parser.add_argument("--home", default=HOME,
                     help="WorkBuddy 数据根目录 (默认: ~/.workbuddy)")
 parser.add_argument("--credit-xlsx", default=None,
-                    help="可选：用量明细 xlsx 路径（来自 workbuddy.cn 用量导出）。提供后，对应日期窗口内的每日 "
-                         "credit 以服务端精确值覆盖本地估算；仅覆盖有数据的日期，其余日期仍为本地估算。"
-                         "低调可选参数，不进默认流程，按需使用。")
-parser.add_argument("--billing-token-file", default=None,
-                    help="可选：用户手动从浏览器导出的用量 API 鉴权头文件（如 DevTools 复制的 `Cookie: ...` 整行，"
-                         "或 `Authorization: Bearer ...`）。提供后，skill 以该 token 调用官方用量 API 拉取精确 credit"
-                         "（opt-in，绝不自动读取宿主 App 凭据）。与 --credit-xlsx 同时提供时，API 优先。")
+                    help="可选：用量明细 xlsx 路径（来自 workbuddy.cn 用量导出）。定位为参考与补充："
+                         "不覆盖逐日 credit；只在本地缺少逐次明细的日期上补入。")
 args = parser.parse_args()
 HOME = args.home
 DB = os.path.join(HOME, "workbuddy.db")
@@ -207,115 +202,6 @@ def read_credit_xlsx(path):
             continue
         result[day] = result.get(day, 0.0) + credit
     return result
-
-
-def read_credit_xlsx_by_model(path):
-    """读取官方用量导出 xlsx，按【模型】汇总服务端精确 credit。
-
-    官方导出列（页面表头顺序）：时间 / 积分消耗 / 模型 / 客户端 / Request
-    （"包含输入提示词"为可选项，默认不含；本函数不读取提示词内容）。
-
-    返回 (by_model, by_model_cnt)；
-      by_model     = {model: credit}   服务端精确值
-      by_model_cnt = {model: 请求数}
-    无「模型」列或读取失败时返回 ({}, {})。
-    """
-    rows, header = _read_xlsx_rows(path)
-    if rows is None:
-        return {}, {}
-    cr_c = find_xlsx_col(header, ["积分消耗", "credit"])
-    md_c = find_xlsx_col(header, ["模型", "model"])
-    if not cr_c:
-        print("  xlsx 缺少 credit 列（积分消耗/credit），无法按模型汇总。", flush=True)
-        return {}, {}
-    if not md_c:
-        print("  xlsx 无「模型」列，无法按模型汇总官方 credit（每日 credit 不受影响）。", flush=True)
-        return {}, {}
-
-    by_model = {}
-    by_model_cnt = {}
-    for cells in rows[1:]:
-        cv = cells.get(cr_c)
-        if cv in (None, ""):
-            continue
-        try:
-            credit = float(str(cv).replace(",", ""))
-        except Exception:
-            continue
-        mv = (cells.get(md_c) or "").strip() or "(未知模型)"
-        by_model[mv] = by_model.get(mv, 0.0) + credit
-        by_model_cnt[mv] = by_model_cnt.get(mv, 0) + 1
-    return by_model, by_model_cnt
-
-
-
-
-
-
-BILLING_API_URL = "https://www.workbuddy.cn/billing/meter/get-user-request-usage"
-
-def aggregate_billing_rows(rows):
-    """把官方 API 返回 data.data[] 聚合为 (day_credit, by_model, by_model_cnt, date_min, date_max)。
-    data.data[] 每项：{requestId, credit, model, client, requestTime, ...}
-    requestTime 形如 'YYYY-MM-DD HH:MM:SS'，按前 10 位归日。
-    """
-    day_map = {}
-    by_model = {}
-    by_model_cnt = {}
-    dates = []
-    for it in rows:
-        rt = it.get("requestTime") or ""
-        day = rt[:10]
-        if len(day) != 10:
-            continue
-        try:
-            credit = float(it.get("credit") or 0)
-        except Exception:
-            credit = 0.0
-        day_map[day] = day_map.get(day, 0.0) + credit
-        m = (it.get("model") or "").strip() or "(未知模型)"
-        by_model[m] = by_model.get(m, 0.0) + credit
-        by_model_cnt[m] = by_model_cnt.get(m, 0) + 1
-        dates.append(day)
-    dmin = min(dates) if dates else None
-    dmax = max(dates) if dates else None
-    return day_map, by_model, by_model_cnt, dmin, dmax
-
-def fetch_billing_usage(token_file, start, end):
-    """调用官方用量 API（opt-in）。返回 aggregate_billing_rows 的元组；失败抛异常由调用方回退。
-    token_file 内容：用户从浏览器 DevTools 复制的鉴权头（如 `Cookie: xxx` 整行，
-    或 `Authorization: Bearer xxx`）。首行 `Key: Value` 解析为请求头；无冒号则当作 Cookie 值。
-    """
-    raw = open(token_file, encoding="utf-8").read().strip()
-    if not raw:
-        raise ValueError("token 文件为空")
-    
-    header_key, header_val = "Cookie", raw
-    for line in raw.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if ":" in line:
-            k, v = line.split(":", 1)
-            header_key, header_val = k.strip(), v.strip()
-        break
-    body = json.dumps({
-        "startTime": f"{start} 00:00:00",
-        "endTime": f"{end} 23:59:59",
-        "pageNum": 1,
-        "pageSize": 3000,
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        BILLING_API_URL, data=body, method="POST",
-        headers={"Content-Type": "application/json", header_key: header_val},
-    )
-    ctx = ssl.create_default_context()
-    with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
-        payload = json.loads(resp.read().decode("utf-8"))
-    if payload.get("code") != 0:
-        raise RuntimeError("用量 API 返回错误: %r" % (payload.get("msg"),))
-    return aggregate_billing_rows(payload.get("data", {}).get("data", []))
-
 
 
 print("[1/4] 读取 workbuddy.db ...", flush=True)
@@ -599,6 +485,25 @@ else:
             fd_a = ent.get("first_date") or ""
             if fd_a and (sid not in sess_first or fd_a < sess_first[sid]):
                 sess_first[sid] = fd_a
+        # 归档独有记录的用量回填会话维度。这批 trace 已被 30 天清理，此前只进了逐日汇总
+        # 与明细表，会话维度（看板 KPI、Top 10 会话表）因此系统性偏低。
+        for r in archived_only:
+            _sid = r.get("session_id") or ""
+            if not _sid:
+                continue
+            _sb = by_session.setdefault(
+                _sid,
+                {"session_id": _sid, "requests": 0, "tokens": 0, "thinking_sec": 0.0,
+                 "credit": 0.0, "errors": 0, "models": set()},
+            )
+            _sb["requests"] += 1
+            _sb["tokens"] += r.get("tokens") or 0
+            _sb["thinking_sec"] += r.get("thinking_sec") or 0
+            _sb["errors"] += r.get("errors") or 0
+            _sb["models"].add(r.get("model") or "unknown")
+            _rd = r.get("date") or ""
+            if _rd and (_sid not in sess_first or _rd < sess_first[_sid]):
+                sess_first[_sid] = _rd
         with open(aj + ".tmp", "w", encoding="utf-8") as fh:
             for o in arch_recs.values():
                 fh.write(json.dumps(o, ensure_ascii=False) + "\n")
@@ -635,20 +540,74 @@ print("[2.8] 轮次扩展：提问原文（jsonl）+ 缓存口径 + 调用明细
 sess_prompt = {}
 need_sids = {r["session_id"] for r in requests if r["session_id"] and not r.get("q")}
 proj_dir = os.path.join(HOME, "projects")
-if os.path.isdir(proj_dir) and need_sids:
+# 逐次调用的精确 credit：读会话文件每行的 providerData.rawUsage.credit 与 providerData.model，
+# 与该行 timestamp 配对，按真实日期/模型归集。与提问原文共用同一次文件遍历。
+pc_day = {}          # {日期: credit}
+pc_sess = {}         # {会话ID: credit}
+pc_model = {}        # {模型: credit}
+pc_calls = 0         # 解析到 credit 的调用条数
+# 逐次调用明细，作为费率拟合与单次提问榜的统一数据源：
+# (日期, 月份, 小时, 模型, 会话, 提问ID, 工作区, 非缓存输入, 缓存输入, 输出, 积分)
+pc_list = []
+if os.path.isdir(proj_dir):
     cand = []
     for root, dirs, fs in os.walk(proj_dir):
         for fn in fs:
-            base, ext = os.path.splitext(fn)
-            if ext == ".jsonl" and base in need_sids:
+            if os.path.splitext(fn)[1] == ".jsonl":
                 cand.append(os.path.join(root, fn))
+    print(f"  会话文件 {len(cand)} 个：一并扫描逐次 credit 与提问原文", flush=True)
     for fp in cand:
         sid = os.path.splitext(os.path.basename(fp))[0]
         items = []
+        want_q = sid in need_sids
         try:
             with open(fp, "r", encoding="utf-8", errors="replace") as fh:
                 for line in fh:
-                    if "<user_query>" not in line or '"role":"user"' not in line:
+                    if '"rawUsage"' in line:
+                        try:
+                            o2 = json.loads(line)
+                        except Exception:
+                            o2 = None
+                        if isinstance(o2, dict):
+                            pd2 = o2.get("providerData")
+                            if isinstance(pd2, dict):
+                                ru2 = pd2.get("rawUsage")
+                                if isinstance(ru2, dict):
+                                    try:
+                                        c2 = float(ru2.get("credit") or 0)
+                                    except Exception:
+                                        c2 = 0.0
+                                    try:
+                                        _ts2 = int(o2.get("timestamp") or 0)
+                                    except Exception:
+                                        _ts2 = 0
+                                    try:
+                                        _pr2 = int(ru2.get("prompt_tokens") or 0)
+                                        _ca2 = int(ru2.get("prompt_cache_hit_tokens") or 0)
+                                        _ou2 = int(ru2.get("completion_tokens") or 0)
+                                    except Exception:
+                                        _pr2 = _ca2 = _ou2 = 0
+                                    m2 = pd2.get("model") or pd2.get("requestModelId") or "unknown"
+                                    _d2, _mo2, _h2 = "", "", -1
+                                    if _ts2:
+                                        try:
+                                            _lt = datetime.datetime.fromtimestamp(_ts2 / 1000.0)
+                                            _d2 = _lt.strftime("%Y-%m-%d")
+                                            _mo2 = _lt.strftime("%Y-%m")
+                                            _h2 = _lt.hour
+                                        except Exception:
+                                            pass
+                                    pc_calls += 1
+                                    pc_sess[sid] = pc_sess.get(sid, 0.0) + c2
+                                    pc_model[m2] = pc_model.get(m2, 0.0) + c2
+                                    if _d2:
+                                        pc_day[_d2] = pc_day.get(_d2, 0.0) + c2
+                                    pc_list.append((_d2, _mo2, _h2, m2, sid,
+                                                    (pd2.get("conversationRequestId") or ""),
+                                                    (o2.get("cwd") or ""),
+                                                    (_pr2 - _ca2 if _pr2 > _ca2 else 0),
+                                                    _ca2, _ou2, c2))
+                    if (not want_q) or "<user_query>" not in line or '"role":"user"' not in line:
                         continue
                     try:
                         o = json.loads(line)
@@ -683,7 +642,7 @@ if os.path.isdir(proj_dir) and need_sids:
             items.sort()
             sess_prompt[sid] = items
 print(f"  提问原文：{len(sess_prompt)}/{len(need_sids)} 个会话命中。", flush=True)
-
+print(f"  逐次 credit：解析 {pc_calls} 次模型调用，覆盖 {len(pc_day)} 天 / {len(pc_sess)} 个会话 / {len(pc_model)} 个模型；逐次明细 {len(pc_list)} 条已备用于费率与归因分析。", flush=True)
 for r in requests:
     if r.get("session_id") not in sess_prompt:
         continue
@@ -750,6 +709,199 @@ for r in requests:
 sessions_map = {sid: (m.get("title") or "")[:60] for sid, m in sess_meta.items()}
 
 
+print("[2.9] 模型费率拟合（按 模型 × 月份，月内再分 标准/低谷 两档）...", flush=True)
+# 费率是不可加总的价格，只能按条件查找，所以单独成表，不参与任何求和。
+# 门槛：进主表需 样本 >= 30 且 标准档 R² >= 0.95；低谷折扣的识别另需两档 R² >= 0.90 且折扣 <= 0.70。
+_RATE_MIN_N = 30
+_RATE_MIN_R2 = 0.95
+_LOW_MIN_R2 = 0.90
+_LOW_MAX_RATIO = 0.70
+
+
+def _fit3(rows_, idx=slice(7, 10)):
+    """无截距三元最小二乘：积分 = a×非缓存输入 + b×缓存输入 + c×输出。返回积分/百万 token。"""
+    n = len(rows_)
+    if n < 4:
+        return None
+    X = [[r[i] for i in range(idx.start, idx.stop)] for r in rows_]
+    y = [r[10] for r in rows_]
+    A = [[0.0] * 3 for _ in range(3)]
+    rhs = [0.0] * 3
+    for i in range(n):
+        xi = X[i]
+        for p in range(3):
+            for q in range(3):
+                A[p][q] += xi[p] * xi[q]
+            rhs[p] += xi[p] * y[i]
+    M = [A[i][:] + [rhs[i]] for i in range(3)]
+    for c in range(3):
+        piv = max(range(c, 3), key=lambda r: abs(M[r][c]))
+        if abs(M[piv][c]) < 1e-18:
+            return None
+        M[c], M[piv] = M[piv], M[c]
+        pv = M[c][c]
+        for k in range(c, 4):
+            M[c][k] /= pv
+        for r in range(3):
+            if r != c and M[r][c] != 0:
+                f = M[r][c]
+                for k in range(c, 4):
+                    M[r][k] -= f * M[c][k]
+    bta = [M[i][3] for i in range(3)]
+    yh = [sum(bb * xx for bb, xx in zip(bta, xi)) for xi in X]
+    my = sum(y) / n
+    ss = sum((v - my) ** 2 for v in y)
+    rss = sum((v - h) ** 2 for v, h in zip(y, yh))
+    return {"a": bta[0] * 1e6, "b": bta[1] * 1e6, "c": bta[2] * 1e6,
+            "r2": (1 - rss / ss) if ss > 0 else None, "n": n}
+
+
+def _hranges(hs):
+    """把小时集合压成区间文本，如 {0..8,12..23} -> '00-08、12-23'。"""
+    hs = sorted(hs)
+    if not hs:
+        return ""
+    out = []
+    s = p = hs[0]
+    for h in hs[1:]:
+        if h == p + 1:
+            p = h
+            continue
+        out.append((s, p))
+        s = p = h
+    out.append((s, p))
+    return "、".join(("%02d" % x) if x == y else ("%02d-%02d" % (x, y)) for x, y in out)
+
+
+# 只用真正扣过费的调用拟合：限免期的零积分调用会把斜率拉平（hy4-preview 实测 R² 从 1.00 掉到 0.22）
+_pc_charged = [r for r in pc_list if r[10] > 0 and r[1] and r[3] != "unknown"]
+_gm = {}
+for r in _pc_charged:
+    _gm.setdefault((r[3], r[1]), []).append(r)
+
+model_rate = []
+for (_mname, _mo), _rs in _gm.items():
+    _base = _fit3(_rs)
+    if not _base:
+        continue
+    _e = {"model": _mname, "period": _mo, "n": _base["n"],
+          "a": round(_base["a"], 2), "b": round(_base["b"], 2), "c": round(_base["c"], 2),
+          "r2": (round(_base["r2"], 4) if _base["r2"] is not None else None),
+          "low_discount": None, "low_hours": "", "low": None}
+    # 时段识别：逐小时算「实际积分 ÷ 该月整体基准积分」的中位数，明显低于最高档的判为低谷
+    _byh = {}
+    for r in _rs:
+        _b0 = (_base["a"] * r[7] + _base["b"] * r[8] + _base["c"] * r[9]) / 1e6
+        if _b0 > 0 and r[2] >= 0:
+            _byh.setdefault(r[2], []).append(r[10] / _b0)
+    _meds = {}
+    for h, v in _byh.items():
+        if len(v) >= 5:
+            v.sort()
+            _meds[h] = v[len(v) // 2]
+    if _meds:
+        _lo = min(_meds.values())
+        if _lo > 0:
+            _ph = sorted(h for h, v in _meds.items() if v / _lo > 1.3)   # 标准时段
+            if _ph:
+                _bp = _fit3([r for r in _rs if r[2] in _ph])
+                _bo = _fit3([r for r in _rs if r[2] not in _ph])
+                if (_bp and _bo and _bp["a"] > 0 and _bp["r2"] is not None
+                        and _bo["r2"] is not None and _bp["r2"] >= _LOW_MIN_R2
+                        and _bo["r2"] >= _LOW_MIN_R2
+                        and (_bo["a"] / _bp["a"]) <= _LOW_MAX_RATIO):
+                    _e.update({"a": round(_bp["a"], 2), "b": round(_bp["b"], 2),
+                               "c": round(_bp["c"], 2), "r2": round(_bp["r2"], 4),
+                               "n": _bp["n"],
+                               "low_discount": round(_bo["a"] / _bp["a"], 3),
+                               "low_hours": _hranges(set(range(24)) - set(_ph)) + " 时",
+                               "low": {"a": round(_bo["a"], 2), "b": round(_bo["b"], 2),
+                                       "c": round(_bo["c"], 2), "r2": round(_bo["r2"], 4),
+                                       "n": _bo["n"]}})
+    model_rate.append(_e)
+
+_latest = {}
+for _e in model_rate:
+    _prev = _latest.get(_e["model"], "")
+    _latest[_e["model"]] = _e["period"] if _e["period"] > _prev else _prev
+for _e in model_rate:
+    if _e["model"].lower().startswith("auto"):
+        _e["reliable"], _e["reason"] = False, "routing"
+    elif _e["n"] < _RATE_MIN_N:
+        _e["reliable"], _e["reason"] = False, "sample"
+    elif _e["r2"] is None or _e["r2"] < _RATE_MIN_R2:
+        _e["reliable"], _e["reason"] = False, "varying"
+    else:
+        _e["reliable"], _e["reason"] = True, ""
+    _e["is_current"] = (_e["period"] == _latest.get(_e["model"]))
+
+# 全程零积分的模型：没有费率可言，单列一类，与「免费就是费率为 0 的生效区间」这一表达保持一致
+for _m in sorted({r[3] for r in pc_list}):
+    if _m in _latest or _m == "unknown":
+        continue
+    _cnt = sum(1 for r in pc_list if r[3] == _m)
+    if _cnt:
+        model_rate.append({"model": _m, "period": "", "n": _cnt, "a": None, "b": None,
+                           "c": None, "r2": None, "low_discount": None, "low_hours": "",
+                           "low": None, "reliable": False, "reason": "free",
+                           "is_current": False})
+model_rate.sort(key=lambda x: (not x["is_current"], x["model"], x["period"]))
+_reliable_n = sum(1 for e in model_rate if e["reliable"])
+print(f"  费率：{len(_gm)} 个 模型×月份 分组，{_reliable_n} 组达到样本≥{_RATE_MIN_N} 且 R²≥{_RATE_MIN_R2}；"
+      f"{sum(1 for e in model_rate if e['low_discount'])} 组识别出低谷折扣。", flush=True)
+
+
+print("[2.95] 单次提问成本榜 ...", flush=True)
+# ---------- 单次提问成本：按 conversationRequestId 聚合 ----------
+# 一次提问会触发多次模型调用，积分是它们的和。用中位数与集中度比用总量更能说明该优化哪里。
+_asks = {}
+for _r in pc_list:
+    _cid = _r[5]
+    if not _cid:
+        continue
+    _a = _asks.get(_cid)
+    if _a is None:
+        _a = {"crid": _cid, "sid": _r[4], "cwd": _r[6], "date": _r[0], "hour": _r[2],
+              "calls": 0, "credit": 0.0, "tokens": 0, "models": {}}
+        _asks[_cid] = _a
+    _a["calls"] += 1
+    _a["credit"] += _r[10]
+    try:
+        _a["tokens"] += int(_r[7]) + int(_r[8]) + int(_r[9])
+    except Exception:
+        pass
+    _a["models"][_r[3]] = _a["models"].get(_r[3], 0.0) + _r[10]
+
+_ask_list = list(_asks.values())
+_ask_total = sum(a["credit"] for a in _ask_list)
+_ask_list.sort(key=lambda x: -x["credit"])
+for _a in _ask_list:
+    _a["models"] = ",".join(m for m, _ in sorted(_a["models"].items(), key=lambda kv: -kv[1]))
+    _a["session_title"] = (sess_meta.get(_a["sid"], {}).get("title") or "")[:40]
+    _cw = (_a.get("cwd") or "").rstrip("\\/")
+    _a["workspace"] = _cw.split("\\")[-1].split("/")[-1] if _cw else ""
+    _a["credit"] = round(_a["credit"], 2)
+    _a["share"] = round(_a["credit"] / _ask_total * 100, 2) if _ask_total else 0.0
+
+_ask_credits = [a["credit"] for a in _ask_list]
+_ask_n = len(_ask_credits)
+ask_top = _ask_list[:20]
+ask_stats = {
+    "count": _ask_n,
+    "credit": round(_ask_total, 2),
+    "median": round(_ask_credits[_ask_n // 2], 2) if _ask_n else 0.0,
+    "max": round(_ask_credits[0], 2) if _ask_n else 0.0,
+    "max_calls": max((a["calls"] for a in _ask_list), default=0),
+    "median_calls": (sorted(a["calls"] for a in _ask_list)[_ask_n // 2] if _ask_n else 0),
+}
+for _pct, _key in ((0.01, "top1pct"), (0.10, "top10pct")):
+    _k = max(1, int(_ask_n * _pct)) if _ask_n else 0
+    ask_stats[_key + "_n"] = _k
+    ask_stats[_key + "_share"] = (round(sum(_ask_credits[:_k]) / _ask_total * 100, 1)
+                                  if (_k and _ask_total) else 0.0)
+print(f"  单次提问：{_ask_n} 次，中位 {ask_stats['median']} 积分，最贵 {ask_stats['max']} 积分；"
+      f"最贵 {ask_stats.get('top10pct_n', 0)} 次占总量 {ask_stats.get('top10pct_share', 0)}%。", flush=True)
+
 print("[3/4] 聚合指标 ...", flush=True)
 days = sorted(by_day.keys())
 day_list = []
@@ -763,9 +915,10 @@ for dk in days:
 
 
 
-credit_source = "local_estimate"
-credit_note = ("本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」（不编造到后续免费/无消费日）；"
-               "趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。")
+credit_source = "percall_local"
+credit_note = ("逐次实测：每日 credit 由本地会话文件里每一次模型调用的 providerData.rawUsage.credit "
+               "按该次调用发生的时间归集而成，是真实日值，并可再按模型拆分。"
+               "改动之前生成的旧快照，其 credit 是按会话首次出现日挂出来的旧口径，已不再采用。")
 
 model_list = []
 for mb in by_model.values():
@@ -784,20 +937,59 @@ for sb in by_session.values():
     sb["model"] = meta.get("model", "") or "unknown"
     sb["thinking_sec"] = round(sb["thinking_sec"], 1)
     
-    cr = sess_credit.get(sb["session_id"], {}).get("credit", 0)
+    sid = sb["session_id"]
+    # 会话 credit 优先取逐次实测值；本地无对话文件可解析的会话回退到数据库账本
+    cr = pc_sess[sid] if sid in pc_sess else sess_credit.get(sid, {}).get("credit", 0)
     sb["credit"] = round(cr, 2)
     
     
     
     
     
-    sid = sb["session_id"]
     fd = sess_first.get(sid)
     sb["first_date"] = fd or ""
-    if fd and fd in by_day:
-        by_day[fd]["credit"] += cr
     sess_list.append(sb)
+
+# 只有逐次明细、没有 trace 的会话。它们的 trace 已被 30 天清理，但 credit 来自本地对话
+# 文件，仍然准确，同样要进入会话维度，否则看板的 credit 合计会漏掉这一部分。
+_pc_first = {}
+for _r in pc_list:
+    _s, _dt = _r[4], _r[0]
+    if _s and _dt and (_s not in _pc_first or _dt < _pc_first[_s]):
+        _pc_first[_s] = _dt
+for sid, _cr in pc_sess.items():
+    if sid in by_session:
+        continue
+    _meta = sess_meta.get(sid, {}) or {}
+    sess_list.append({
+        "session_id": sid,
+        "title": (_meta.get("title") or "")[:60],
+        "status": _meta.get("status", ""),
+        "models": "",
+        "model": _meta.get("model", "") or "unknown",
+        "requests": 0, "tokens": 0, "thinking_sec": 0.0,
+        "credit": round(_cr, 2),
+        "errors": 0,
+        "first_date": _pc_first.get(sid) or sess_first.get(sid, ""),
+    })
 sess_list.sort(key=lambda x: x["tokens"], reverse=True)
+
+# ---------- 逐日 credit：以逐次实测值为准 ----------
+# 旧口径把整个会话的 credit 挂到会话首次出现日，会造出“当天 token 很少却扣了很多分”的假峰。
+# 现改为逐次归日；没有逐次明细的日期不写入 credit，避免引入旧口径的错值。
+pc_days = set(pc_day)
+for _d, _c in pc_day.items():
+    _row = by_day.get(_d)
+    if _row is not None:
+        _row["credit"] = round(_c, 2)
+    else:
+        by_day[_d] = {"date": _d, "requests": 0, "tokens": 0, "input": 0, "output": 0,
+                      "cached": 0, "thinking_sec": 0.0, "credit": round(_c, 2),
+                      "errors": 0, "sessions": 0}
+# pc=True 表示该日 credit 来自逐次实测；--credit-xlsx 只补 pc 为假、即本地无明细的日期
+for _k in by_day:
+    by_day[_k]["pc"] = _k in pc_days
+day_list[:] = [by_day[k] for k in sorted(by_day.keys())]
 
 # ---------- 每日总量覆盖层（持久化于归档 + --seed 导入，每次运行自动应用） ----------
 restored_days, corrected_days = [], []
@@ -834,14 +1026,20 @@ if not args.no_archive:
         for d, srow in daily_overlay.items():
             cur = by_day.get(d)
             if cur is None:
-                row = {k: srow.get(k, 0) for k in ("requests", "tokens", "input", "output", "cached", "thinking_sec", "credit", "errors", "sessions")}
+                # 覆盖层独有日期：本地既无 trace 也无逐次明细，只补总量字段。
+                # credit 不采用旧快照值——旧快照的 credit 是按会话首现日挂出来的旧口径。
+                row = {k: srow.get(k, 0) for k in ("requests", "tokens", "input", "output", "cached", "thinking_sec", "errors", "sessions")}
+                row["credit"] = 0.0
                 row["date"] = d
                 by_day[d] = row
                 restored_days.append(d)
             elif srow.get("tokens", 0) > cur.get("tokens", 0):
-                for k in ("requests", "tokens", "input", "output", "cached", "thinking_sec", "credit", "errors", "sessions"):
+                for k in ("requests", "tokens", "input", "output", "cached", "thinking_sec", "errors", "sessions"):
                     if k in srow:
                         cur[k] = srow[k]
+                # credit 只在没有逐次实测值的日期上由覆盖层补入，避免把旧口径错值盖回来
+                if d not in pc_days and "credit" in srow:
+                    cur["credit"] = srow["credit"]
                 corrected_days.append(d)
         if restored_days or corrected_days:
             day_list[:] = [by_day[k] for k in sorted(by_day.keys())]
@@ -854,155 +1052,112 @@ _valid_days = [k for k in by_day if re.match(r"^\d{4}-\d{2}-\d{2}$", k)]
 
 xlsx_date_min = None
 xlsx_date_max = None
-model_cost_official = []   
 if args.credit_xlsx:
     print("[3.5] 读取用量导出 xlsx (--credit-xlsx) ...", flush=True)
     xmap = read_credit_xlsx(args.credit_xlsx)
     if xmap:
         covered = 0
         for b in day_list:
-            if b["date"] in xmap:
+            # 参考补充地位：只在本地没有逐次明细的日期上补入，不覆盖逐次实测值
+            if b["date"] in xmap and b["date"] not in pc_days:
                 b["credit"] = round(xmap[b["date"]], 2)
                 covered += 1
+        _overlap = len([d for d in xmap if d in pc_days])
         if covered:
-            credit_source = "xlsx_precise"
-            credit_note = (f"credit 已用用量导出 xlsx 精确覆盖 {covered} 天（窗口内为服务端精确值）；"
-                           f"未覆盖日期仍为本地估算。xlsx 最多含 1 个月，历史长期趋势仍看 token。")
+            credit_note = (f"每日 credit 以逐次实测值为准；xlsx 仅作参考补充，"
+                           f"另补入 {covered} 天本地无逐次明细的日期。xlsx 最多含 1 个月。")
         else:
-            credit_note = "提供的 xlsx 未包含与本地数据重叠的日期，credit 仍为本地估算。"
+            credit_note = (f"每日 credit 以逐次实测值为准；提供的 xlsx 中有 {_overlap} 天与本地明细重叠，"
+                           f"未采用以免覆盖实测值。")
         xlsx_dates = sorted(xmap.keys())
         xlsx_date_min = xlsx_dates[0]
         xlsx_date_max = xlsx_dates[-1]
 
-        
-        
-        
-        
-        xmodel, xmodel_cnt = read_credit_xlsx_by_model(args.credit_xlsx)
-        if xmodel:
-            
-            win_tokens = {}
-            for (d, m), tk in day_model_tokens.items():
-                if xlsx_date_min <= d <= xlsx_date_max:
-                    win_tokens[m] = win_tokens.get(m, 0) + tk
-            for m, cr in sorted(xmodel.items(), key=lambda kv: kv[1]):
-                tk = win_tokens.get(m, 0)
-                model_cost_official.append({
-                    "model": m,
-                    "requests": xmodel_cnt.get(m, 0),
-                    "tokens": tk,
-                    "credit": round(cr, 2),
-                    "credit_per_100k": (round(cr / tk * 100000.0, 2) if tk else None),
-                    
-                    "zero_credit": (cr <= 0.0 and tk >= 1_000_000),
-                })
-            print(f"  xlsx 按模型汇总 {len(xmodel)} 个模型（服务端精确 credit）。", flush=True)
         if covered:
-            print(f"  xlsx 覆盖 {covered} 天，credit 已更新为精确值；日期窗口 {xlsx_date_min}~{xlsx_date_max}。", flush=True)
+            print(f"  xlsx 参考补充：补入 {covered} 天本地无逐次明细的日期；窗口 {xlsx_date_min}~{xlsx_date_max}。", flush=True)
         else:
-            print("  xlsx 与本地数据无日期重叠，每日 credit 维持本地估算。", flush=True)
+            print("  xlsx 与本地缺失日期不重叠，未采用（每日 credit 仍为逐次实测值）。", flush=True)
     else:
-        print("  xlsx 读取失败或未识别到必要列，credit 维持本地估算。", flush=True)
+        print("  xlsx 读取失败或未识别到必要列，已跳过（不影响逐次实测的每日 credit）。", flush=True)
 
 
 
-billing_date_min = None
-billing_date_max = None
-if args.billing_token_file:
-    print("[3.6] 用量 API（--billing-token-file，用户手动提供 token）...", flush=True)
-    try:
-        _data_dates = [r["date"] for r in requests if r["date"] != "unknown"]
-        api_start = (min(_data_dates) if _data_dates
-                     else (datetime.date.today() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
-        api_end = max(_data_dates) if _data_dates else datetime.date.today().strftime("%Y-%m-%d")
-        day_map, by_model, by_model_cnt, bmin, bmax = fetch_billing_usage(
-            args.billing_token_file, api_start, api_end)
-        if day_map:
-            covered = 0
-            for b in day_list:
-                if b["date"] in day_map:
-                    b["credit"] = round(day_map[b["date"]], 2)
-                    covered += 1
-            if covered:
-                credit_source = "api_precise"
-                credit_note = (f"credit 已用官方用量 API 精确覆盖 {covered} 天"
-                               f"（窗口内为服务端精确值，由用户手动提供的 token 拉取）；"
-                               f"未覆盖日期仍为本地估算。")
-            billing_date_min, billing_date_max = bmin, bmax
-            
-            if by_model:
-                win_tokens = {}
-                for (d, m), tk in day_model_tokens.items():
-                    if (billing_date_min or "0000") <= d <= (billing_date_max or "9999"):
-                        win_tokens[m] = win_tokens.get(m, 0) + tk
-                model_cost_official = []
-                for m, cr in sorted(by_model.items(), key=lambda kv: kv[1]):
-                    tk = win_tokens.get(m, 0)
-                    model_cost_official.append({
-                        "model": m,
-                        "requests": by_model_cnt.get(m, 0),
-                        "tokens": tk,
-                        "credit": round(cr, 2),
-                        "credit_per_100k": (round(cr / tk * 100000.0, 2) if tk else None),
-                        "zero_credit": (cr <= 0.0 and tk >= 1_000_000),
-                    })
-                print(f"  API 按模型汇总 {len(by_model)} 个模型（服务端精确 credit）。", flush=True)
-            print(f"  API 覆盖 {covered} 天，credit 已更新为精确值；窗口 {billing_date_min}~{billing_date_max}。", flush=True)
-        else:
-            print("  API 返回空数据，credit 维持本地估算。", flush=True)
-    except Exception as e:
-        print("  用量 API 拉取失败，credit 维持本地估算：", e, flush=True)
 
 
-print("[2.6] 模型性价比 ...", flush=True)
-model_cost = {}
-for sb in sess_list:
-    m = sb.get("model") or "unknown"
-    mc = model_cost.setdefault(
-        m,
-        {"model": m, "sessions": 0, "tokens": 0, "credit": 0.0},
-    )
-    mc["sessions"] += 1
-    mc["tokens"] += sb["tokens"]
-    mc["credit"] += sb["credit"]
-model_cost_list = []
-for mc in model_cost.values():
-    if mc["model"] == "unknown" or mc["tokens"] <= 0:
+print("[2.6] 模型成本（逐次实测口径）...", flush=True)
+# credit 与 token 都取自 providerData.rawUsage，同源同口径；模型归属按每次调用自带的模型名。
+# 旧版按会话级模型标签分组、分母用 trace 的 totalTokens：两者口径不同，且跨模型的会话会把积分
+# 算到标签头上（实测 hy3 被记 4145.89 积分、实际为 0；deepseek-v4-flash 少算 97%）。
+_mc = {}
+for _r in pc_list:
+    if _r[3] == "unknown":
         continue
-    c1k = (mc["credit"] / mc["tokens"] * 100000.0) if mc["tokens"] else 0.0
-    mc["credit_per_100k"] = round(c1k, 2)
-    
-    mc["zero_credit"] = (mc["credit"] <= 0.0 and mc["tokens"] >= 1_000_000)
-    model_cost_list.append(mc)
-model_cost_list.sort(key=lambda x: x["credit_per_100k"])
+    _e = _mc.setdefault(_r[3], {"model": _r[3], "calls": 0, "miss": 0, "cached": 0,
+                                "out": 0, "tokens": 0, "credit": 0.0})
+    _e["calls"] += 1
+    _e["miss"] += _r[7]
+    _e["cached"] += _r[8]
+    _e["out"] += _r[9]
+    _e["tokens"] += _r[7] + _r[8] + _r[9]
+    _e["credit"] += _r[10]
+
+# 把当前生效费率联结进来，让同一张表既能看“花了多少”又能看“贵在哪一档”
+_rate_cur = {e["model"]: e for e in model_rate if e["is_current"] and e["period"]}
+
+# 展示门槛：token 达到最大模型 1/100 以上才进表。
+# 用意是滤掉「只试过几次、不构成成本讨论」的长尾模型——它们会撑长表格，
+# 又不影响任何成本结论。同一门槛同时用于下方优化建议，保证「表里出现的模型」
+# 与「参与建议的模型」是同一批，不再出现表里有费率却不参与建议的割裂。
+_model_top_tokens = max((_e["tokens"] for _e in _mc.values()), default=0)
+_MODEL_TOKEN_FLOOR = _model_top_tokens / 100.0
+
+model_cost_list = []
+for _m, _e in _mc.items():
+    if _e["tokens"] <= 0 or _e["tokens"] < _MODEL_TOKEN_FLOOR:
+        continue
+    _e["credit_per_million"] = round(_e["credit"] / _e["tokens"] * 1e6, 2)
+    _e["cache_rate"] = (round(_e["cached"] / (_e["cached"] + _e["miss"]) * 100, 1)
+                        if (_e["cached"] + _e["miss"]) else None)
+    _e["tokens_per_call"] = round(_e["tokens"] / _e["calls"]) if _e["calls"] else 0
+    _e["zero_credit"] = (_e["credit"] <= 0.0)
+    _re = _rate_cur.get(_m)
+    _e["rate"] = ({"period": _re["period"], "a": _re["a"], "b": _re["b"], "c": _re["c"],
+                   "r2": _re["r2"], "n": _re["n"], "low_discount": _re["low_discount"],
+                   "low_hours": _re["low_hours"], "low": _re["low"],
+                   "reliable": _re["reliable"], "reason": _re["reason"]} if _re else None)
+    model_cost_list.append(_e)
+# 免费模型（积分恒为 0）排在最后；其余按每百万 token 积分升序，越低越省
+model_cost_list.sort(key=lambda x: (x["credit"] <= 0, x["credit_per_million"]))
 
 
 model_tips = []
 substantial = [
     m for m in model_cost_list
-    if m["model"] not in ("auto", "unknown")
+    if m["model"] != "unknown"
+    and not m["model"].lower().startswith("auto")
     and "preview" not in m["model"]
     and "agent" not in m["model"]
-    and m["tokens"] >= 10_000_000
-    and m["credit"] > 0.0          
+    and m["credit"] > 0.0
 ]
 if len(substantial) >= 2:
-    cheapest = min(substantial, key=lambda x: x["credit_per_100k"])
-    priciest = max(substantial, key=lambda x: x["credit_per_100k"])
-    if priciest["credit_per_100k"] > 0:
-        save = (priciest["credit_per_100k"] - cheapest["credit_per_100k"]) / priciest["credit_per_100k"] * 100
+    cheapest = min(substantial, key=lambda x: x["credit_per_million"])
+    priciest = max(substantial, key=lambda x: x["credit_per_million"])
+    if priciest["credit_per_million"] > 0:
+        save = ((priciest["credit_per_million"] - cheapest["credit_per_million"])
+                / priciest["credit_per_million"] * 100)
         if save >= 5:
             model_tips.append(
-                f"在可比任务量下(均≥1000万token)，切换至「{cheapest['model']}」"
-                f"(credit/10万token={cheapest['credit_per_100k']}) 相比「{priciest['model']}」"
-                f"(credit/10万token={priciest['credit_per_100k']}) 预计节省约 {save:.0f}% 的 credit；"
-                f"前提是两个模型处理的工作负载可互相迁移。")
+                f"在可比任务量下，切换至「{cheapest['model']}」"
+                f"(每百万 token 积分={cheapest['credit_per_million']}) 相比「{priciest['model']}」"
+                f"(每百万 token 积分={priciest['credit_per_million']}) 预计节省约 {save:.0f}% 的积分；"
+                f"前提是两个模型处理的工作负载可互相迁移。"
+                f"注意这里的数字是实际发生的平均值，受任务形态影响，不是模型单价。")
 
 for m in model_cost_list:
-    if m["zero_credit"] and m["tokens"] >= 10_000_000:
+    if m["zero_credit"]:
         model_tips.append(
-            f"「{m['model']}」当前 credit/10万token=0（消耗 credit {m['credit']:.2f}），"
-            f"可能处于限免/促销期；不建议把它作为长期成本基准。")
+            f"「{m['model']}」全程积分消耗为 0（token {m['tokens'] / 1e6:.1f}M），"
+            f"处于限免期；不适合作为长期成本基准。")
 
 
 
@@ -1114,7 +1269,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.4.1",
+    "version": "1.5.0",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -1136,10 +1291,6 @@ summary = {
     "avg_efficiency_tok_per_sec": round(total_output / total_thinking, 1) if total_thinking else 0,
     "date_min": (min(_valid_days) if _valid_days else (min(dates) if dates else None)),
     "date_max": (max(_valid_days) if _valid_days else (max(dates) if dates else None)),
-    "credit_xlsx_date_min": xlsx_date_min,
-    "credit_xlsx_date_max": xlsx_date_max,
-    "billing_date_min": billing_date_min,
-    "billing_date_max": billing_date_max,
     "model_count": len(model_list),
 }
 
@@ -1159,11 +1310,13 @@ out = {
     "summary": summary,
     "by_day": day_list,
     "by_model": model_list,
-    "by_session": sess_list[:200],
+    "by_session": sess_list[:500],
     "requests_sample": requests_trim,
     "requests_slim": requests_slim,
     "by_model_cost": model_cost_list,
-    "model_cost_official": model_cost_official,
+    "model_rate": model_rate,
+    "ask_top": ask_top,
+    "ask_stats": ask_stats,
     "model_tips": model_tips,
     "spike_days": spike_days,
     "error_detail": error_detail,
@@ -1204,8 +1357,25 @@ if (not archive_existed) and (not args.no_archive):
         "detail": "本次运行已建立本地归档（~/.workbuddy/usage-archive）。WorkBuddy 对 trace 仅保留 30 天——请至少每 30 天运行一次本技能（建议配置每日定时自动化），断档超 30 天期间的 trace 将无法追溯。",
     })
 _orphan_credit, _orphan_sessions = 0.0, 0
+# 有逐次明细 credit、但本地已无请求级 token 明细的日期（trace 已清理）：
+# credit 按实际发生日计入且数值正确，但这几天 token 缺失；需说明，否则会被误认为数据出错。
+_credit_only = [b for b in day_list if b.get("pc") and not b.get("tokens")]
+if _credit_only:
+    _co_amount = round(sum(b.get("credit", 0) for b in _credit_only), 2)
+    _co_pct = (round(_co_amount / total_credit * 100, 1) if total_credit else 0.0)
+    _co_days = sorted(b["date"] for b in _credit_only)
+    warnings.append({
+        "type": "credit_only_days",
+        "count": len(_credit_only),
+        "amount": _co_amount,
+        "pct": _co_pct,
+        "days": _co_days,
+        "detail": (f"以下 {len(_credit_only)} 天的 token 明细已被 WorkBuddy 的 30 天清理机制删除，"
+                   f"积分不受影响（合计 {_co_amount}，占全部积分的 {_co_pct}%）。"
+                   f"这几天在 token 图上偏低或为 0 属正常现象。日期：{'、'.join(_co_days)}。"),
+    })
 for sid, ent in sess_credit.items():
-    if sid in by_session:
+    if (sid in by_session) or (sid in pc_sess):
         continue
     _cr = ent.get("credit", 0) or 0
     if _cr:
@@ -1216,7 +1386,7 @@ if _orphan_credit > 0.5:
         "type": "orphan_credit",
         "count": _orphan_sessions,
         "amount": round(_orphan_credit, 2),
-        "detail": f"另有 {_orphan_sessions} 个历史会话的 credit 合计 {round(_orphan_credit, 2)}，其逐笔明细已不在本地，未在每日趋势中逐日展示。",
+        "detail": f"另有 {_orphan_sessions} 个历史会话的 credit 合计 {round(_orphan_credit, 2)}，本地既无逐次明细也无请求记录，未计入每日趋势。",
     })
 out["warnings"] = warnings
 
@@ -1285,7 +1455,7 @@ _CSV_LABELS = {
     "zh": {
         "title": "# WorkBuddy 用量全量导出（生成时间 {ts}）",
         "caliber": "# 缓存命中率口径: {c}",
-        "sec_daily": "## 每日汇总", "sec_model": "## 按模型", "sec_sessions": "## 会话清单（前200）", "sec_calls": "## 调用明细",
+        "sec_daily": "## 每日汇总", "sec_model": "## 按模型", "sec_sessions": "## 会话清单（前500）", "sec_calls": "## 调用明细",
         "sec_err_top": "## 错误-高频", "sec_err_type": "## 错误-按类型", "sec_err_tool": "## 错误-按工具",
         "sec_err_model": "## 错误-按模型", "sec_err_sess": "## 错误-按会话", "sec_err_samples": "## 错误-近期样本",
         "date": "日期", "reqs": "请求数", "token": "Token", "input": "输入", "output": "输出", "cache": "缓存命中",
@@ -1294,11 +1464,23 @@ _CSV_LABELS = {
         "think_min": "思考(分)", "status": "状态", "first_date": "首现日期",
         "time": "时间", "duration": "时长秒", "tools": "工具数", "prompt": "提问",
         "msg": "错误信息", "count": "次数", "share": "占比", "type": "类型", "tool": "工具", "top_err": "最高频错误",
+        "sec_rate": "## 模型成本与费率（当前生效）", "sec_asks": "## 单次提问成本榜（前20）",
+        "per_million": "每百万token积分", "miss_c": "非缓存输入", "cache_c": "缓存输入", "out_c": "输出",
+        "low_disc": "低谷折扣", "r2": "拟合R²", "period": "生效期间", "asks_n": "模型调用数",
+        "workspace": "工作区", "ask_cr": "提问积分", "share_cr": "占总积分",
+        "sec_rate_hist": "## 模型费率全部阶段",
+        "sec_ask_stat": "## 单次提问集中度",
+        "reliable": "是否可作费率", "low_hours": "低谷时段", "reason": "不可用原因", "sample_n": "样本数",
+        "item": "项目", "value": "数值", "amount": "贡献积分",
+        "ask_total": "提问总数", "calls_of": "调用次数", "median_cr": "提问积分中位", "max_cr": "提问积分最大",
+        "max_calls": "单次最多调用数", "median_calls": "调用数中位", "ask_tok": "提问token",
+        "top1_n": "最贵1%次数", "top1_share": "最贵1%占比", "top10_n": "最贵10%次数", "top10_share": "最贵10%占比",
+        "delta": "积分变化",
     },
     "en": {
         "title": "# WorkBuddy usage full export (generated at {ts})",
         "caliber": "# Cache-hit caliber: {c}",
-        "sec_daily": "## Daily summary", "sec_model": "## By model", "sec_sessions": "## Sessions (top 200)", "sec_calls": "## Call details",
+        "sec_daily": "## Daily summary", "sec_model": "## By model", "sec_sessions": "## Sessions (top 500)", "sec_calls": "## Call details",
         "sec_err_top": "## Errors - top", "sec_err_type": "## Errors - by type", "sec_err_tool": "## Errors - by tool",
         "sec_err_model": "## Errors - by model", "sec_err_sess": "## Errors - by session", "sec_err_samples": "## Errors - recent samples",
         "date": "Date", "reqs": "Requests", "token": "Tokens", "input": "Input", "output": "Output", "cache": "Cache hit",
@@ -1307,10 +1489,165 @@ _CSV_LABELS = {
         "think_min": "Think(min)", "status": "Status", "first_date": "First seen",
         "time": "Time", "duration": "Duration(s)", "tools": "Tools", "prompt": "Prompt",
         "msg": "Error message", "count": "Count", "share": "Share", "type": "Type", "tool": "Tool", "top_err": "Top error",
+        "sec_rate": "## Model cost & rates (currently effective)", "sec_asks": "## Costliest single requests (top 20)",
+        "per_million": "Credit per 1M tokens", "miss_c": "Uncached input", "cache_c": "Cached input", "out_c": "Output",
+        "low_disc": "Off-peak discount", "r2": "Fit R2", "period": "Effective period", "asks_n": "Model calls",
+        "workspace": "Workspace", "ask_cr": "Credit", "share_cr": "Share of total",
+        "sec_rate_hist": "## Model rates - all periods",
+        "sec_ask_stat": "## Prompt cost concentration",
+        "reliable": "Usable as rate", "low_hours": "Off-peak hours", "reason": "Unavailable reason", "sample_n": "Samples",
+        "item": "Item", "value": "Value", "amount": "Credit contribution",
+        "ask_total": "Total prompts", "calls_of": "Calls", "median_cr": "Median prompt credit", "max_cr": "Max prompt credit",
+        "max_calls": "Max calls in one prompt", "median_calls": "Median calls", "ask_tok": "Prompt tokens",
+        "top1_n": "Top 1% count", "top1_share": "Top 1% share", "top10_n": "Top 10% count", "top10_share": "Top 10% share",
+        "delta": "Credit change",
     },
 }
 _csv_lang = _detect_lang()
 CSV_L = _CSV_LABELS[_csv_lang]
+
+
+# ---------- xlsx 写出（仅用标准库 zipfile + XML，无第三方依赖） ----------
+# 与全量 CSV 同源：CSV 的每个分区对应一个工作表，供在线表格工具与 Excel 直接翻查。
+def _write_xlsx(path, sheets, title=""):
+    import zipfile
+    from xml.sax.saxutils import escape as _xesc
+
+    def _colref(i):
+        s = ""
+        i += 1
+        while i:
+            i, r = divmod(i - 1, 26)
+            s = chr(65 + r) + s
+        return s
+
+    def _txt(v):
+        s = "" if v is None else str(v)
+        s = s.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+        return _xesc("".join(ch for ch in s if ch >= " "))
+
+    def _cell_xml(ref, v):
+        if v is None:
+            return ""
+        if isinstance(v, bool):
+            return '<c r="%s" t="inlineStr"><is><t>%s</t></is></c>' % (ref, "TRUE" if v else "FALSE")
+        if isinstance(v, (int, float)):
+            if isinstance(v, float) and (v != v or v in (float("inf"), float("-inf"))):
+                return '<c r="%s" t="inlineStr"><is><t>%s</t></is></c>' % (ref, _txt(v))
+            return '<c r="%s"><v>%s</v></c>' % (ref, repr(v) if isinstance(v, float) else v)
+        s = _txt(v)
+        if s == "":
+            return ""
+        return '<c r="%s" t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>' % (ref, s)
+
+    # 工作表名净化：Excel 限制 31 字符、禁用 : \ / ? * [ ]、不区分大小写去重
+    _used = set()
+    _names = []
+    for _sh in sheets:
+        _nm = re.sub(r"[:\\/?*\[\]]", " ", str(_sh.get("name") or "")).strip().strip("'").strip() or "Sheet"
+        _nm = _nm[:31]
+        _base, _k = _nm, 2
+        while _nm.lower() in _used:
+            _suf = "_%d" % _k
+            _nm = _base[:31 - len(_suf)] + _suf
+            _k += 1
+        _used.add(_nm.lower())
+        _names.append(_nm)
+
+    _sheet_xml = []
+    for _sh in sheets:
+        _rows = _sh.get("rows") or []
+        _w = []
+        for _r in _rows[:200]:
+            for _i, _v in enumerate(_r[:64]):
+                _s = "" if _v is None else str(_v)
+                _n = sum(2 if ord(_c) > 127 else 1 for _c in _s)
+                if _i >= len(_w):
+                    _w.append(_n)
+                elif _n > _w[_i]:
+                    _w[_i] = _n
+        _cols = ""
+        if _w:
+            _cols = "<cols>" + "".join(
+                '<col min="%d" max="%d" width="%d" customWidth="1"/>'
+                % (_i + 1, _i + 1, min(max(_n + 2, 8), 60)) for _i, _n in enumerate(_w)) + "</cols>"
+        _body = []
+        for _ri, _r in enumerate(_rows):
+            _cs = "".join(_cell_xml(_colref(_ci) + str(_ri + 1), _v) for _ci, _v in enumerate(_r))
+            _body.append('<row r="%d">%s</row>' % (_ri + 1, _cs) if _cs else '<row r="%d"/>' % (_ri + 1))
+        _maxc = max((len(_r) for _r in _rows), default=0)
+        _dim = ('A1:' + _colref(_maxc - 1) + str(max(len(_rows), 1))) if _maxc else 'A1'
+        _sheet_xml.append(
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            '<dimension ref="%s"/>' % _dim +
+            '<sheetViews><sheetView workbookViewId="0">'
+            '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
+            '</sheetView></sheetViews>'
+            '<sheetFormatPr defaultRowHeight="15"/>' + _cols +
+            '<sheetData>' + "".join(_body) + '</sheetData></worksheet>')
+
+    _ct = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+           '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+           '<Default Extension="xml" ContentType="application/xml"/>'
+           '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+           '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+           '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+           + "".join('<Override PartName="/xl/worksheets/sheet%d.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                     % (_i + 1) for _i in range(len(_sheet_xml))) + '</Types>')
+
+    _rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+             '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+             '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+             '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+             '</Relationships>')
+
+    _core = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+             '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"'
+             ' xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/"'
+             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+             '<dc:title>%s</dc:title>'
+             '<dcterms:created xsi:type="dcterms:W3CDTF">%s</dcterms:created>'
+             '</cp:coreProperties>'
+             % (_xesc(title or ""), datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")))
+
+    _wb = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+           ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+           + "".join('<sheet name="%s" sheetId="%d" r:id="rId%d"/>' % (_xesc(_names[_i]), _i + 1, _i + 1)
+                     for _i in range(len(_names))) + '</sheets></workbook>')
+
+    _n = len(_sheet_xml)
+    _wbrels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+               '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+               + "".join('<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet%d.xml"/>'
+                         % (_i + 1, _i + 1) for _i in range(_n))
+               + '<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+                 % (_n + 1)
+               + '</Relationships>')
+
+    _styles = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+               '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+               '<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>'
+               '<fills count="2"><fill><patternFill patternType="none"/></fill>'
+               '<fill><patternFill patternType="gray125"/></fill></fills>'
+               '<borders count="1"><border/></borders>'
+               '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+               '<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>'
+               '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+               '</styleSheet>')
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as _z:
+        _z.writestr("[Content_Types].xml", _ct)
+        _z.writestr("_rels/.rels", _rels)
+        _z.writestr("docProps/core.xml", _core)
+        _z.writestr("xl/workbook.xml", _wb)
+        _z.writestr("xl/_rels/workbook.xml.rels", _wbrels)
+        _z.writestr("xl/styles.xml", _styles)
+        for _i, _sx in enumerate(_sheet_xml):
+            _z.writestr("xl/worksheets/sheet%d.xml" % (_i + 1), _sx)
+
 
 # ---------- 全量 CSV 同步输出（内置浏览器无法下载 blob 时直接取文件） ----------
 try:
@@ -1320,8 +1657,18 @@ try:
             s2 = '"' + s2.replace('"', '""') + '"'
         return s2
     _csv_lines = []
+    _xlsx_sheets = []      # 与 CSV 同源收集，按 "## 分区名" 切分成工作表
+    _cur_sheet = [None]
+
     def _csv_push(arr):
         _csv_lines.append(",".join(_csv_cell(x) for x in arr))
+        if arr == "":
+            _cur_sheet[0] = None
+        elif len(arr) == 1 and isinstance(arr[0], str) and arr[0].startswith("## "):
+            _cur_sheet[0] = {"name": arr[0][3:].strip(), "rows": []}
+            _xlsx_sheets.append(_cur_sheet[0])
+        elif _cur_sheet[0] is not None:
+            _cur_sheet[0]["rows"].append(list(arr))
     _csv_push([CSV_L["title"].format(ts=datetime.datetime.now().isoformat(timespec="seconds"))])
     _csv_push([CSV_L["caliber"].format(c=(summary.get("cache_caliber") or "cached/in"))])
     _csv_push("")
@@ -1331,10 +1678,50 @@ try:
     _csv_push(""); _csv_push([CSV_L["sec_model"]]); _csv_push([CSV_L["model"],CSV_L["reqs"],CSV_L["token"],CSV_L["input"],CSV_L["output"],CSV_L["calls_n"],CSV_L["think_sec"],CSV_L["errors"],CSV_L["eff"]])
     for m in (out.get("by_model") or []):
         _csv_push([m.get("model"),m.get("requests"),m.get("tokens"),m.get("input"),m.get("output"),m.get("calls"),m.get("thinking_sec"),m.get("errors"),m.get("efficiency_tok_per_sec")])
+    _tot_cr = (out.get("summary") or {}).get("total_credit") or 0
+    _csv_push(""); _csv_push([CSV_L["sec_rate"]])
+    _csv_push([CSV_L["model"],CSV_L["calls_n"],CSV_L["token"],CSV_L["credit"],CSV_L["per_million"],
+               CSV_L["miss_c"],CSV_L["cache_c"],CSV_L["out_c"],CSV_L["low_disc"],CSV_L["r2"],
+               CSV_L["period"],CSV_L["share_cr"]])
+    for m in (out.get("by_model_cost") or []):
+        _rt = m.get("rate") or {}
+        _ld = _rt.get("low_discount")
+        _low = ("半价" if (_ld and abs(_ld - 0.5) < 0.03) else ("约%.1f折" % (_ld * 10) if _ld else ""))
+        _csv_push([m.get("model"), m.get("calls"), m.get("tokens"), round(m.get("credit", 0), 2),
+                   m.get("credit_per_million"), _rt.get("a", ""), _rt.get("b", ""), _rt.get("c", ""),
+                   _low, _rt.get("r2", ""), _rt.get("period", ""),
+                   (round(m.get("credit", 0) / _tot_cr * 100, 1) if _tot_cr else "")])
+    _csv_push(""); _csv_push([CSV_L["sec_rate_hist"]])
+    _csv_push([CSV_L["model"],CSV_L["period"],CSV_L["sample_n"],CSV_L["miss_c"],CSV_L["cache_c"],CSV_L["out_c"],
+               CSV_L["low_disc"],CSV_L["low_hours"],CSV_L["r2"],CSV_L["reliable"],CSV_L["reason"]])
+    for _mr in (out.get("model_rate") or []):
+        _mld = _mr.get("low_discount")
+        _mlow = ("半价" if (_mld and abs(_mld - 0.5) < 0.03) else ("约%.1f折" % (_mld * 10) if _mld else ""))
+        _csv_push([_mr.get("model"), _mr.get("period"), _mr.get("n"),
+                   _mr.get("a", ""), _mr.get("b", ""), _mr.get("c", ""),
+                   _mlow, _mr.get("low_hours", ""), _mr.get("r2", ""),
+                   ("是" if _mr.get("reliable") else "否"), _mr.get("reason", "")])
     _csv_push(""); _csv_push([CSV_L["sec_sessions"]]); _csv_push([CSV_L["session"],CSV_L["title_c"],CSV_L["model"],CSV_L["reqs"],CSV_L["token"],CSV_L["think_min"],CSV_L["credit"],CSV_L["errors"],CSV_L["status"],CSV_L["first_date"]])
     for x in (out.get("by_session") or []):
         _th = round(x.get("thinking_sec", 0) / 60, 1) if x.get("thinking_sec") else 0
         _csv_push([x.get("session_id"),x.get("title"),x.get("model"),x.get("requests"),x.get("tokens"),_th,x.get("credit"),x.get("errors"),x.get("status"),x.get("first_date")])
+    _csv_push(""); _csv_push([CSV_L["sec_asks"]])
+    _csv_push([CSV_L["date"],CSV_L["time"],CSV_L["session"],CSV_L["title_c"],CSV_L["model"],
+               CSV_L["asks_n"],CSV_L["token"],CSV_L["ask_cr"],CSV_L["share_cr"],CSV_L["workspace"]])
+    for x in (out.get("ask_top") or []):
+        _csv_push([x.get("date"), ("%02d:00" % x.get("hour") if x.get("hour") is not None and x.get("hour") >= 0 else ""),
+                   x.get("sid"), x.get("session_title"), x.get("models"), x.get("calls"),
+                   x.get("tokens", ""), x.get("credit"), x.get("share"), x.get("workspace")])
+    _as = out.get("ask_stats") or {}
+    if _as:
+        _csv_push(""); _csv_push([CSV_L["sec_ask_stat"]])
+        _csv_push([CSV_L["item"], CSV_L["value"]])
+        for _k, _lab in (("count", "ask_total"), ("credit", "credit"), ("median", "median_cr"), ("max", "max_cr"),
+                         ("max_calls", "max_calls"), ("median_calls", "median_calls"),
+                         ("top1pct_n", "top1_n"), ("top1pct_share", "top1_share"),
+                         ("top10pct_n", "top10_n"), ("top10pct_share", "top10_share")):
+            if _k in _as:
+                _csv_push([CSV_L[_lab], _as[_k]])
     _csv_push(""); _csv_push([CSV_L["sec_calls"]]); _csv_push([CSV_L["date"],CSV_L["time"],CSV_L["session"],CSV_L["model"],CSV_L["status"],CSV_L["token"],CSV_L["input"],CSV_L["output"],CSV_L["cache"],CSV_L["calls_n"],CSV_L["tools"],CSV_L["think_sec"],CSV_L["duration"],CSV_L["errors"],CSV_L["prompt"]])
     for r in (out.get("requests_full") or []):
         _ts = datetime.datetime.fromtimestamp(r["ts"]).strftime("%Y-%m-%d %H:%M:%S") if r.get("ts") else ""
@@ -1354,10 +1741,22 @@ try:
     for x in (_ed.get("by_session") or []): _csv_push([x.get("title") or x.get("session_id") or "",x.get("count"),x.get("top_msg")])
     _csv_push(""); _csv_push([CSV_L["sec_err_samples"]]); _csv_push([CSV_L["date"],CSV_L["session"],CSV_L["model"],CSV_L["tool"],CSV_L["msg"]])
     for x in (_ed.get("samples") or []): _csv_push([x.get("date"),x.get("session_id"),x.get("model"),x.get("tool"),x.get("msg")])
-    OUT_CSVF = os.path.join(OUT_DIR, "usage-full-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv")
+    _stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    OUT_CSVF = os.path.join(OUT_DIR, "usage-full-" + _stamp + ".csv")
     with open(OUT_CSVF, "w", encoding="utf-8-sig", newline="") as f:
         f.write("\r\n".join(_csv_lines))
     print("已生成全量 CSV:", os.path.basename(OUT_CSVF), f"（表头语言: {_csv_lang}；与看板同目录；内置浏览器无法下载时直接取用）", flush=True)
+    if not _xlsx_sheets:
+        print("全量 xlsx 未生成：没有收集到分区数据。", flush=True)
+    else:
+        OUT_XLSXF = os.path.join(OUT_DIR, "usage-full-" + _stamp + ".xlsx")
+        try:
+            _write_xlsx(OUT_XLSXF, _xlsx_sheets,
+                        title=CSV_L["title"].format(ts=datetime.datetime.now().isoformat(timespec="seconds")))
+            print("已生成全量 xlsx:", os.path.basename(OUT_XLSXF),
+                  f"（{len(_xlsx_sheets)} 个工作表，与 CSV 分区一一对应；供在线表格与 Excel 直接翻查）", flush=True)
+        except Exception as e:
+            print("全量 xlsx 生成失败（CSV 与看板不受影响）:", e, flush=True)
 except Exception as e:
     print("全量 CSV 生成失败（不影响看板）:", e, flush=True)
 

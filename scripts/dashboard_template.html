@@ -57,11 +57,6 @@
   .filter-bar input[type=date]{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;}
   .filter-bar button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
   .filter-bar button:hover{opacity:.9;}
-  .filter-bar .xlsx-upload{display:inline-flex;align-items:center;gap:8px;align-self:center;}
-  .xlsx-btn{cursor:pointer;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);user-select:none;}
-  .xlsx-btn:hover{border-color:var(--accent);}
-  .xlsx-status{font-size:11px;color:var(--muted);}
-  .xlsx-status.err{color:var(--red);}
   .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px;}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
   .kpi .label{color:var(--muted);font-size:12px;}
@@ -82,7 +77,17 @@
   .est-badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;margin-left:8px;vertical-align:middle;font-weight:400;}
   .est-badge.local{background:rgba(255,204,102,.15);color:var(--yellow);border:1px solid rgba(255,204,102,.4);}
   .est-badge.precise{background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.4);}
-  .kpi .val .est{color:var(--yellow);font-weight:700;margin-left:2px;}
+  tr.grp th{background:var(--panel2);font-size:11px;color:var(--muted);text-align:center;font-weight:600;}
+  tr.rate-hist td{background:var(--panel2);font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);}
+  tr.rate-hist td:first-child{padding-left:26px;font-style:italic;}
+  tr.rate-hist .hist-note{opacity:.75;font-style:normal;}
+  tr.rate-hist .hist-span{color:var(--muted);opacity:.8;font-weight:400;}
+  tr.rate-hist td.num{font-variant-numeric:tabular-nums;}
+  td.rate-na{color:var(--muted);}
+  .rate-why{display:block;font-size:10px;opacity:.75;margin-top:2px;font-weight:400;}
+  .rate-toggle{cursor:pointer;user-select:none;opacity:.65;margin-right:4px;font-size:11px;}
+  .rate-toggle:hover{opacity:1;}
+  .th-unit{display:block;font-weight:400;font-size:10px;color:var(--muted);line-height:1.3;}
   .kpi-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;word-break:break-word;}
   .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);font-size:11px;}
   .err{color:var(--red);}
@@ -127,11 +132,6 @@
     <label data-i18n="start" data-page-node-id="wpMHnS86w8SYloYk6bEkMs">起始日期 <input type="date" id="startDate" data-page-node-id="0xG0usREFfbCWmpfoLir6I"></label>
     <label data-i18n="end" data-page-node-id="Qa32Ke6EWr9BgGHwj8LhlD">结束日期 <input type="date" id="endDate" data-page-node-id="tN5eD9xLuW5EQNFzWL8NLU"></label>
     <span id="dateErr" style="display:none;color:#e5484d;font-size:12px;align-self:center;" data-page-node-id="YLkmWp07zGOCMQstQqNWaC"></span>
-    <span class="xlsx-upload" data-page-node-id="4c5tJZjbIzcvBaqFS9wIqk">
-      <label class="xlsx-btn" for="xlsxFile" data-i18n="xlsxUploadLabel" data-page-node-id="CeJtRkNJVjPFAXcla79fuP">上传用量导出 xlsx</label>
-      <input type="file" id="xlsxFile" accept=".xlsx" hidden data-page-node-id="1UHWWhjo6MneMl8II9FiKv">
-      <span class="xlsx-status" id="xlsxStatus" data-page-node-id="qQIZyZJGMxqdaly6wLgYHu"></span>
-    </span>
   </div>
 
   <div class="kpis" id="kpis" data-page-node-id="6HAMfAJy79IybY2E7kgMWL"></div>
@@ -139,7 +139,7 @@
   <div class="grid" data-page-node-id="K4cxSS9Gtv68o8Q6Q4z87B">
     <div class="card" data-page-node-id="ZsKexyHPbVK58PPUvO3cAa"><h3 data-i18n="cardDailyToken" data-page-node-id="PxAxNV5JPBscKzBhu2Koze">每日 Token 消耗</h3><div class="hint" data-i18n="hintDailyToken" data-page-node-id="CHiQMEEguPqejS3AnKmf5y">按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。</div><canvas id="cDailyToken" data-page-node-id="3tWXhW8RFsVUGT6FpIbwQA"></canvas></div>
     <div class="card" data-page-node-id="cEntnmcMEDCbCS1n2fpb9C"><h3 data-i18n="cardDailyThink" data-page-node-id="7BQJZneucc6KJXSxGCifbR">每日思考用时（小时）</h3><canvas id="cDailyThink" data-page-node-id="06jp5DbmxKo4QJwdvewypw"></canvas></div>
-    <div class="card" data-page-node-id="eVq6BaCQud0h5WOdhwxhBu"><h3 data-i18n="cardDailyCredit" data-page-node-id="jt6dsEiyEOWbExDn0OiyrJ">每日积分消耗（credit）<span class="est-badge local" id="creditBadge" data-page-node-id="fnaHx4DKZPm5bFFKJHgktm"></span></h3><div class="hint" data-i18n="hintDailyCredit" data-page-node-id="rn2rP8C2kqBgDYbFzqks1S">本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。</div><canvas id="cDailyCredit" data-page-node-id="OPTvLPCAEklZjhIbxBHdwm"></canvas></div>
+    <div class="card" data-page-node-id="eVq6BaCQud0h5WOdhwxhBu"><h3 data-i18n="cardDailyCredit" data-page-node-id="jt6dsEiyEOWbExDn0OiyrJ">每日积分消耗（credit）<span class="est-badge local" id="creditBadge" data-page-node-id="fnaHx4DKZPm5bFFKJHgktm"></span></h3><div class="hint" data-i18n="hintDailyCredit" data-page-node-id="rn2rP8C2kqBgDYbFzqks1S">逐次实测：每一次模型调用的 credit 取自本地会话文件 providerData.rawUsage，按该次调用发生的时间归入当日，是真实日值，可再按模型与时段拆分。</div><canvas id="cDailyCredit" data-page-node-id="OPTvLPCAEklZjhIbxBHdwm"></canvas></div>
     <div class="card" data-page-node-id="c9NcINzo50q55so3JBI4uo"><h3 data-i18n="cardModelShare" data-page-node-id="GnSYG6dI9jzkwtULCIsMdf">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare" data-page-node-id="CnGC9LDjkSJzOxmJoGV5A1">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare" data-page-node-id="lQfjH5KGw1NHG3pj1D0fx5"></canvas></div>
     <div class="card" data-page-node-id="cRFfOJGmWgo29kEfKFalsN"><h3 data-i18n="cardModelEff" data-page-node-id="0Pwl2loa99fEKzHckr4m6y">主要模型思考效率</h3><div class="hint" data-i18n="hintModelEff" data-page-node-id="Z1GBA5J9czNj4CCEhEqqVI">输出 token / 思考秒数；仅统计样本数 ≥ 10 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff" data-page-node-id="zBvv6Hz6uBoLLn7eE4eXis"></canvas></div>
     <div class="card" data-page-node-id="9mSW2giYHUWmgNLBI3GYLB"><h3 data-i18n="cardScatter" data-page-node-id="vOOt2oaraH3vI06ppCjMZW">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter" data-page-node-id="42hAAhmEE9pOBEzRzH1pPT">每个点=一次请求；左上方=高产出低耗时=高效率</div><canvas id="cScatter" data-page-node-id="dXJvZVoqKkeE0TazTtpDrL"></canvas></div>
@@ -154,13 +154,27 @@
       <div class="hint" data-i18n="hintSpike" data-page-node-id="nUnovTmLKDkviZ8pKPeveQ">按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。</div>
       <div id="spikeDays" data-page-node-id="my6YSVKyFonO5HGgSzNe0i"></div>
     </div>
-    <div class="card full" data-page-node-id="7tJefT3HtE9eB5LDP77e6k"><h3 data-i18n="cardCost" data-page-node-id="t1m0mEag3q44VqJwwW11TO">模型性价比排行（credit / 10万 token）</h3><div class="hint" data-i18n="hintCost" data-page-node-id="LTXWv5CoSIOtRN8rs6Y3C4">按模型聚合 credit 与 token；数值越低性价比越高。</div>
+    <div class="card full" data-page-node-id="7tJefT3HtE9eB5LDP77e6k"><h3 data-i18n="cardCost" data-page-node-id="t1m0mEag3q44VqJwwW11TO">模型成本与费率</h3><div class="hint" data-i18n="hintCost" data-page-node-id="LTXWv5CoSIOtRN8rs6Y3C4">「成本实况」是实际发生额，含调用数、总 Token、总积分与每百万 token 积分；「费率结构」是该模型当前生效的单价，含非缓存输入、缓存输入、输出三档与低谷折扣。</div>
       <div class="note" id="modelCostNote" data-page-node-id="BuiGELqR6XyGXOFMoe5TMU"></div>
-      <div class="tbl-scroll" data-page-node-id="xCkGlBaQx47hvCt5oBRLTR"><table id="tModelCost" data-page-node-id="UmYGcWmldtiLZ1T0fbRH2S"><thead data-page-node-id="uu9R5vWx6AlUBvHwTyrw2I"><tr data-page-node-id="Z2H7A2zUQzDV39NGxgxBiU">
-        <th data-i18n="thModel2" data-page-node-id="LHEODHKVIFqC1HEOBJDMI5">模型</th><th class="num" id="thCostCount" data-i18n="thSessions" data-page-node-id="nD8cEVDRnSWPQFGhRwvDxb">会话数</th><th class="num" data-i18n="thTotalToken" data-page-node-id="ZHKp7Nb1NyhcO35LQxSnia">总 Token</th>
-        <th class="num" data-i18n="thTotalCredit" data-page-node-id="LWZOQ2A6rUJkYXQ0bQSwr6">总 Credit</th><th class="num" data-i18n="thCostPer100k" data-page-node-id="BeD2JLg5gYkkYZxNWwVRcj">Credit / 1k token</th>
+      <div class="tbl-scroll" data-page-node-id="xCkGlBaQx47hvCt5oBRLTR"><table id="tModelCost" data-page-node-id="UmYGcWmldtiLZ1T0fbRH2S"><thead data-page-node-id="uu9R5vWx6AlUBvHwTyrw2I">
+        <tr class="grp"><th colspan="5" data-i18n="grpCost">成本实况</th><th colspan="4" data-i18n="grpRate">费率结构</th></tr>
+        <tr data-page-node-id="Z2H7A2zUQzDV39NGxgxBiU">
+        <th data-i18n="thModel2" data-page-node-id="LHEODHKVIFqC1HEOBJDMI5">模型</th><th class="num" id="thCostCount" data-i18n="thCalls" data-page-node-id="nD8cEVDRnSWPQFGhRwvDxb">调用数</th><th class="num" data-i18n="thTotalToken" data-page-node-id="ZHKp7Nb1NyhcO35LQxSnia">总 Token</th>
+        <th class="num" data-i18n="thTotalCredit" data-page-node-id="LWZOQ2A6rUJkYXQ0bQSwr6">总积分</th><th class="num" data-i18n="thPerMillion" data-page-node-id="BeD2JLg5gYkkYZxNWwVRcj">每百万 token 积分</th>
+        <th class="num" data-i18n="thRateMiss" data-page-node-id="rmiss01">非缓存输入<span class="th-unit" data-i18n="thUnit">积分/百万</span></th><th class="num" data-i18n="thRateCache" data-page-node-id="rcache01">缓存输入<span class="th-unit" data-i18n="thUnit">积分/百万</span></th><th class="num" data-i18n="thRateOut" data-page-node-id="rout01">输出<span class="th-unit" data-i18n="thUnit">积分/百万</span></th>
+        <th class="num" data-i18n="thLowDisc" data-page-node-id="rlow01">低谷折扣</th>
       </tr></thead><tbody data-page-node-id="8xPfbwkFdlvy9kRAepJEmH"></tbody></table></div>
       <div class="note" id="modelTips" data-page-node-id="2lUN6Y5lV8rZeMxe3kt0o2"></div>
+    </div>
+    <div class="card full" id="askCard" style="display:none">
+      <h3 data-i18n="cardAskTop">单次提问成本榜</h3>
+      <div class="hint" data-i18n="hintAskTop">一次提问会触发多次模型调用，积分是这些调用的总和。下表按积分从高到低列出最贵的 20 次，用来定位真正费钱的那几次。</div>
+      <div class="note" id="askStat"></div>
+      <div class="tbl-scroll"><table id="tAskTop"><thead><tr>
+        <th data-i18n="thDate">日期</th><th class="num" data-i18n="thHour">时刻</th><th data-i18n="thSession">会话</th>
+        <th data-i18n="thModel">模型</th><th class="num" data-i18n="thCalls">调用数</th>
+        <th class="num" data-i18n="thCredit">积分</th><th class="num" data-i18n="thShareOfTotal">占总积分</th>
+      </tr></thead><tbody></tbody></table></div>
     </div>
     <div class="card full" id="cacheCard" style="display:none">
       <h3>缓存命中率 <span id="cacheOverall" style="font-weight:700"></span> <span id="cacheCaliber" style="font-size:11px;font-weight:400;opacity:.7"></span></h3>
@@ -206,26 +220,38 @@ const I18N = {
     unitHour: "小时", unitTokS: "tok/s",
     cardDailyToken: "每日 Token 消耗", cardDailyCredit: "每日积分消耗（credit）", cardDailyThink: "每日思考用时（小时）",
     hintDailyToken: "按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。",
-    hintDailyCredit: "本地估算：会话级 credit 无逐日时间戳，默认归到会话「首次出现日」；趋势形状近似、非精确值。提供用量导出 xlsx 可覆盖为精确值。",
-    hintDailyCreditPrecise: "精确：当前展示的每日 credit 已由上传的用量导出 xlsx 覆盖为服务端精确值（窗口内）；未覆盖日期仍为本地估算。",
-    xlsxUploadLabel: "上传用量导出 xlsx",
-    badgeLocal: "本地估算", badgePrecise: "精确（用量导出）", badgeApiPrecise: "精确（用量 API）",
+    hintDailyCredit: "逐次实测：每一次模型调用的 credit 取自本地会话文件 providerData.rawUsage，按该次调用发生的时间归入当日，是真实日值，可再按模型与时段拆分。",
+    badgeLocal: "本地估算", badgePercall: "逐次实测",
     cardModelShare: "各模型 Token 占比", cardModelEff: "主要模型思考效率",
     cardScatter: "思考效率散点：思考用时 × 输出 token", cardTopSessions: "Top 10 会话",
-    cardSpike: "用量高峰探查", cardCost: "模型性价比排行（credit / 10万 token）",
+    cardSpike: "用量高峰探查", cardCost: "模型成本与费率",
     cardErrors: "每日错误数",
     hintModelShare: "按模型名称聚合，Top10 之外合并为「其他」",
     hintModelEff: "输出 token / 思考秒数",
     hintScatter: "每个点=一次请求；左上方=高产出低耗时=高效率",
     hintTopSessions: "会话标题 + 模型 + 思考用时 + credit 消耗",
     hintSpike: "按当天 token 总量排序列出最高的几天，分析：当天会话、模型 token 构成、错误率、最大单次请求。",
-    hintCost: "按模型聚合 credit 与 token；数值越低性价比越高。",
+    hintCost: "「成本实况」是实际发生额：调用数、总 Token、总积分，以及每百万 token 积分。「费率结构」是该模型当前生效的单价：非缓存输入、缓存输入、输出三档，另附低谷折扣。每百万 token 积分是该模型所有调用混在一起算出的平均值，随 token 构成变化——缓存命中多它就低，输出多它就高；三档单价由平台设定，不随用量变化。把平均值放到三档之间对照，可以看出用量主要落在哪一档。费率由本地逐次明细反推，WorkBuddy 调整后重新生成。",
     hintErrors: "span 级 status=error 的计数",
     thSession: "会话标题", thModel: "模型", thReq: "请求数", thToken: "Token",
     thThink: "思考(分)", thCredit: "Credit", thErr: "错误", thStatus: "状态",
-    thModel2: "模型", thSessions: "会话数", thTotalToken: "总 Token", thTotalCredit: "总 Credit", thCostPer100k: "Credit / 10万 token",
-    tipOptimize: (c,cv,p,pv,s)=>`优化建议：在可比任务量下，切换至「${c}」(credit/10万token=${cv}) 相比「${p}」(credit/10万token=${pv}) 预计节省约 ${s}% credit。`,
-    tipPromo: (m)=>`提示：「${m}」当前 credit/10万token=0，可能处于限免/促销期，不建议作为长期成本基准。`,
+    thModel2: "模型", thSessions: "会话数", thTotalToken: "总 Token", thTotalCredit: "总积分",
+    grpCost: "成本实况", grpRate: "费率结构",
+    thCalls: "调用数", thPerMillion: "每百万 token 积分",
+    thRateMiss: "非缓存输入", thRateCache: "缓存输入", thRateOut: "输出", thUnit: "积分/百万",
+    thLowDisc: "低谷折扣",
+    rateNA: "费率不可用", rateHistoryTitle: "历史费率", promoTag: "限免",
+    rateHistSpan: "整段时期汇总，不分月", rateHistDisc: "见当期",
+    discHalf: "半价",
+    costCaliber: "口径：积分与 token 均取自每次调用的原始用量记录，同源同口径；模型归属按每次调用自带的模型名。只列出用量达到最高模型 1/100 以上的模型；其中低于 30 次调用或费率有波动的模型不标注费率。",
+    cardAskTop: "单次提问成本榜",
+    hintAskTop: "一次提问会触发多次模型调用，积分是这些调用的总和。下表按积分从高到低列出最贵的 20 次，用来定位真正费钱的那几次。",
+    thDate: "日期", thHour: "时刻", thShareOfTotal: "占总积分",
+    askStatText: (o)=>`共 ${o.n} 次提问：中位 ${o.med} 积分，最贵一次 ${o.max} 积分，触发 ${o.maxc} 次模型调用。最贵的 ${o.c10n} 次（前 10%）贡献了 ${o.c10}% 的积分；最贵的 ${o.c1n} 次（前 1%）贡献 ${o.c1}%。`,
+    reasonSample: "样本不足，仅供参考", reasonVarying: "费率有波动，仅供参考",
+    reasonRouting: "路由模型，实际后端不固定", reasonFree: "限时免费，无费率",
+    tipOptimize: (c,cv,p,pv,s)=>`优化建议：在可比任务量下，切换至「${c}」(每百万 token 积分=${cv}) 相比「${p}」(每百万 token 积分=${pv}) 预计节省约 ${s}%。注意这是实际发生的平均值，受任务形态影响，不是模型单价。`,
+    tipPromo: (m)=>`提示：「${m}」全程积分消耗为 0，处于限免期，不建议作为长期成本基准。`,
     tipNoModel: "提示：当前筛选范围内可比模型样本不足，暂无可生成的切换建议；或多数会话为 auto / unknown。",
     emptyCost: "无模型级数据（trace 均未携带 sessionId）",
     bottomNote: "报告数据说明见 data-guide.md",
@@ -247,31 +273,44 @@ const I18N = {
     unitHour: "h", unitTokS: "tok/s",
     cardDailyToken: "Daily Token Usage", cardDailyCredit: "Daily Credit", cardDailyThink: "Daily Thinking Time (hours)",
     hintDailyToken: "Attributed by local timezone of each request's startedAt; reflects true daily token usage.",
-    hintDailyCredit: "Local estimate: session-level credit has no per-day timestamp, attributed to the session's first-seen day by default; shape approximated, not exact. Provide a usage-export xlsx to override with precise values.",
-    hintDailyCreditPrecise: "Precise: daily credit in view is overridden by the uploaded usage-export xlsx (server-precise within window); uncovered days remain local estimate.",
-    xlsxUploadLabel: "Upload usage xlsx",
-    badgeLocal: "Local estimate", badgePrecise: "Precise (export)", badgeApiPrecise: "Precise (API)",
+    hintDailyCredit: "Per-call measured: each model call's credit is read from the local session file (providerData.rawUsage) and attributed to the day the call actually happened, so the daily series is real and can be split by model and time of day.",
+    badgeLocal: "Local estimate", badgePercall: "Per-call measured",
     cardModelShare: "Token Share by Model", cardModelEff: "Primary Model Thinking Efficiency",
     cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
-    cardSpike: "Usage Spike Explorer", cardCost: "Model Cost Efficiency (credit / 100k token)",
+    cardSpike: "Usage Spike Explorer", cardCost: "Model Cost & Rates",
     cardErrors: "Daily Errors",
     warnArchiveFirst: "A local archive (~/.workbuddy/usage-archive) was created on this run. WorkBuddy keeps local traces for only 30 days - run this skill at least once every 30 days (a daily automation is recommended); activity during gaps longer than 30 days cannot be traced back.",
     warnSeed: (r,c)=>`Restored daily totals for ${r} day(s) and corrected ${c} day(s) from an older snapshot; per-request details for those days are unavailable (not present in the snapshot).`,
     warnOrphan: (n,x)=>`${n} historical session(s) totaling ${x} credit have no local per-request details left; they are not shown per-day in the trend.`,
     warnSkipped: (n,names)=>`Skipped ${n} corrupted/unreadable trace file(s) (report may be incomplete): ${names}`,
     warnBadCredit: (n)=>`${n} session(s) had unparseable credit_json; their credit is counted as 0 (token and daily trends unaffected).`,
+    warnCreditOnly: (n,x,p,d)=>`Token detail for ${n} day(s) was deleted by WorkBuddy's 30-day cleanup. Credit is unaffected (${x} total, ${p}% of all credit). Low or zero token values on those days are expected on the daily view. Dates: ${d}.`,
     hintModelShare: "Aggregated by model name; Top10 merged into “Others”.",
     hintModelEff: "output token / think seconds",
     hintScatter: "Each point = one request; top-left = high output, low time = efficient.",
     hintTopSessions: "Session title + model + think time + credit.",
     hintSpike: "Days sorted by daily token total, highest first; breakdown: sessions on that day, model token mix, error rate, largest single request.",
-    hintCost: "Credit & token aggregated by session primary model; lower = better cost efficiency.",
+    hintCost: "\"Cost reality\" is what actually happened: calls, total tokens, total credit, and credit per 1M tokens. \"Rate structure\" is the model's currently effective unit prices: non-cached input, cached input, output, plus the off-peak discount. Credit per 1M tokens is an average across all of this model's calls and shifts with the token mix - more cache hits push it down, more output pushes it up. The three unit prices are set by the platform and do not change with usage. Comparing the average against the three prices shows which tier your usage leans on. Rates are inferred from local per-call detail and regenerated after WorkBuddy changes them.",
     hintErrors: "Count of spans with status=error.",
     thSession: "Session", thModel: "Model", thReq: "Requests", thToken: "Token",
     thThink: "Think(min)", thCredit: "Credit", thErr: "Err", thStatus: "Status",
-    thModel2: "Model", thSessions: "Sessions", thTotalToken: "Total Token", thTotalCredit: "Total Credit", thCostPer100k: "Credit / 100k token",
-    tipOptimize: (c,cv,p,pv,s)=>`Tip: for comparable workloads, switching to "${c}" (credit/100k=${cv}) vs "${p}" (credit/100k=${pv}) could save ~${s}% credit.`,
-    tipPromo: (m)=>`Note: "${m}" current credit/100k=0, likely in free/promo period; not a reliable long-term cost baseline.`,
+    thModel2: "Model", thSessions: "Sessions", thTotalToken: "Total Token", thTotalCredit: "Total credit",
+    grpCost: "Actual cost", grpRate: "Rate structure",
+    thCalls: "Calls", thPerMillion: "Credit per 1M tokens",
+    thRateMiss: "Uncached input", thRateCache: "Cached input", thRateOut: "Output", thUnit: "credit/1M",
+    thLowDisc: "Off-peak",
+    rateNA: "Rate unavailable", rateHistoryTitle: "Past rates", promoTag: "free",
+    rateHistSpan: "Period total, not per month", rateHistDisc: "See current",
+    discHalf: "half",
+    costCaliber: "Caliber: credit and tokens both come from each call's raw usage record, so they share one basis; model attribution follows the model name on each call. Only models reaching 1/100 of the top model's usage are listed; among those, models with fewer than 30 calls or unstable rates show no rate.",
+    cardAskTop: "Costliest Single Requests",
+    hintAskTop: "One request triggers many model calls, and the credit is their sum. The 20 costliest requests are listed below, to locate the few that really cost money.",
+    thDate: "Date", thHour: "Hour", thShareOfTotal: "Share of total",
+    askStatText: (o)=>`${o.n} requests in total: median ${o.med} credit, costliest ${o.max} credit with ${o.maxc} model calls. The costliest ${o.c10n} requests (top 10%) account for ${o.c10}% of all credit; the top ${o.c1n} (top 1%) account for ${o.c1}%.`,
+    reasonSample: "Too few samples - indicative only", reasonVarying: "Rate varies within the period - indicative only",
+    reasonRouting: "Routing model, backend not fixed", reasonFree: "Free of charge, no rate",
+    tipOptimize: (c,cv,p,pv,s)=>`Tip: for comparable workloads, switching to "${c}" (credit per 1M tokens=${cv}) vs "${p}" (${pv}) could save ~${s}%. This is a realized average shaped by task mix, not a model list price.`,
+    tipPromo: (m)=>`Note: "${m}" consumed zero credit across the whole period (free of charge); not a reliable long-term cost baseline.`,
     tipNoModel: "Note: insufficient comparable models in current range, or most sessions are auto / unknown.",
     emptyCost: "No model-level data (traces lack sessionId).",
     bottomNote: "See data-guide.md for data definitions.",
@@ -319,12 +358,6 @@ function dateMinMax(){
 
 
 function defaultRange(){
-  const s = T.summary || {};
-  const wmin = s.billing_date_min || s.credit_xlsx_date_min;
-  const wmax = s.billing_date_max || s.credit_xlsx_date_max;
-  if (wmin && wmax){
-    return [wmin, wmax];
-  }
   return dateMinMax();
 }
 function destroyCharts(){ charts.forEach(c=>c.destroy()); charts.length=0; }
@@ -347,226 +380,6 @@ function rerenderCharts(){ const [s,e]=getCurRange(); render(s,e); }
 
 
 
-let sharedStrings = null;
-
-async function inflateRaw(bytes){
-  if (typeof DecompressionStream === 'undefined')
-    throw new Error('浏览器不支持 DecompressionStream，无法离线解析 xlsx（请用新版 Edge/Chrome，或改用 --credit-xlsx CLI）。');
-  const ds = new DecompressionStream('deflate-raw');
-  const w = ds.writable.getWriter(); w.write(bytes); w.close();
-  const r = ds.readable.getReader();
-  const chunks=[]; let total=0;
-  for(;;){ const {done,value}=await r.read(); if(done) break; if(value){chunks.push(value); total+=value.length;} }
-  const out=new Uint8Array(total); let off=0;
-  for(const c of chunks){ out.set(c, off); off+=c.length; }
-  return out;
-}
-function strFromU8(u){ return new TextDecoder('utf-8').decode(u); }
-
-
-async function readZipEntries(buf){
-  const dv = new DataView(buf);
-  const entries = {};
-  const sig = 0x04034b50;
-  let off = 0;
-  while (off + 30 <= buf.byteLength){
-    let method, compSize, nameLen, extraLen, name, dataStart, data;
-    try {
-      if (dv.getUint32(off, true) !== sig){ off++; continue; }
-      method   = dv.getUint16(off+8, true);
-      compSize = dv.getUint32(off+18, true);
-      nameLen  = dv.getUint16(off+26, true);
-      extraLen = dv.getUint16(off+28, true);
-      name = strFromU8(new Uint8Array(buf, off+30, nameLen));
-      dataStart = off + 30 + nameLen + extraLen;
-      if (dataStart + compSize > buf.byteLength){ off++; continue; }
-      data = new Uint8Array(buf, dataStart, compSize);
-      if (method === 8) data = await inflateRaw(data); 
-    } catch(e){ off++; continue; }
-    entries[name] = { method, data };
-    off = dataStart + compSize;
-  }
-  return entries;
-}
-
-function xmlText(el){
-  let s='';
-  if(!el) return s;
-  el.querySelectorAll('t, is t').forEach(t=>{ s += (t.textContent||''); });
-  return s;
-}
-
-
-function parseSheetXml(xmlStr){
-  const doc = new DOMParser().parseFromString(xmlStr, 'application/xml');
-  if (doc.querySelector('parsererror')) return null;
-  const rows = [];
-  doc.querySelectorAll('sheetData > row').forEach(row=>{
-    const cells = {};
-    row.querySelectorAll('c').forEach(c=>{
-      const ref = c.getAttribute('r') || '';
-      const m = ref.match(/[A-Z]+/);
-      const col = m ? m[0] : null;
-      if(!col) return;
-      const t = c.getAttribute('t');
-      let val = '';
-      if (t === 's'){
-        const v = c.querySelector('v');
-        if (v && sharedStrings) val = sharedStrings[parseInt(v.textContent,10)] || '';
-      } else if (c.querySelector('is')) {
-        val = xmlText(c.querySelector('is'));
-      } else {
-        const v = c.querySelector('v');
-        if (v) val = v.textContent;
-      }
-      cells[col] = val;
-    });
-    rows.push(cells);
-  });
-  return rows;
-}
-
-function findXlsxCol(header, names){
-  for (const [col,val] of Object.entries(header||{})){
-    if (val && names.some(nm=> String(val).toLowerCase().includes(nm.toLowerCase()))) return col;
-  }
-  return null;
-}
-function toDay(tv){
-  if(!tv) return null;
-  tv = String(tv).trim();
-  const m = tv.match(/^(\d{4}-\d{2}-\d{2})[ T]\d{2}:\d{2}:\d{2}/);
-  if (m) return m[1];
-  if (tv.length>=10 && /^\d{4}-\d{2}-\d{2}/.test(tv)) return tv.slice(0,10);
-  const t = Date.parse(tv);
-  if (!isNaN(t)) return new Date(t).toISOString().slice(0,10);
-  return null;
-}
-
-
-
-async function parseCreditXlsxFile(file){
-  const buf = await file.arrayBuffer();
-  const entries = await readZipEntries(buf);
-  sharedStrings = [];
-  if (entries['xl/sharedStrings.xml']){
-    const doc = new DOMParser().parseFromString(strFromU8(entries['xl/sharedStrings.xml'].data), 'application/xml');
-    doc.querySelectorAll('sst > si').forEach(si=>{ sharedStrings.push(xmlText(si)); });
-  }
-  let sheetName = 'xl/worksheets/sheet1.xml';
-  const cands = Object.keys(entries).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort();
-  if (!entries[sheetName] && cands.length) sheetName = cands[0];
-  if (!entries[sheetName]) throw new Error('xlsx 未找到 worksheet');
-  const rows = parseSheetXml(strFromU8(entries[sheetName].data));
-  if (!rows || !rows.length) throw new Error('xlsx 解析失败或为空');
-  const header = rows[0];
-  const crC = findXlsxCol(header, ['积分消耗','credit']);
-  const tmC = findXlsxCol(header, ['时间','time']);
-  const mdC = findXlsxCol(header, ['模型','model']);
-  if (!crC || !tmC) throw new Error('xlsx 缺少必要列（积分消耗/credit、时间/time）');
-  const byDay = {};
-  const byModel = {};
-  for (let i=1;i<rows.length;i++){
-    const cells = rows[i];
-    let credit;
-    try { credit = parseFloat(String(cells[crC])); } catch(e){ credit = NaN; }
-    if (isNaN(credit)) continue;
-    const day = toDay(cells[tmC]);
-    if (day) byDay[day] = (byDay[day]||0) + credit;
-    const model = (mdC != null && cells[mdC] != null) ? String(cells[mdC]).trim() : '';
-    if (model){
-      if (!byModel[model]) byModel[model] = {credit:0, count:0};
-      byModel[model].credit += credit;
-      byModel[model].count += 1;
-    }
-  }
-  return {byDay, byModel};
-}
-
-async function handleXlsxUpload(file){
-  const statusEl = document.getElementById('xlsxStatus');
-  if (!statusEl) return;
-  if (!file) return;
-  statusEl.className = 'xlsx-status';
-  statusEl.textContent = (LANG==='en') ? 'Parsing xlsx…' : '正在解析 xlsx…';
-  try {
-    const parsed = await parseCreditXlsxFile(file);
-    const xmap = parsed.byDay;
-    const xmodel = parsed.byModel;
-    if (!xmap || !Object.keys(xmap).length){
-      statusEl.className = 'xlsx-status err';
-      statusEl.textContent = (LANG==='en') ? 'No valid rows (need 时间/time & 积分消耗/credit).' : '无有效行（需要 时间/time 与 积分消耗/credit 列）。';
-      return;
-    }
-    let covered = 0;
-    (T.by_day||[]).forEach(b=>{
-      if (Object.prototype.hasOwnProperty.call(xmap, b.date)){
-        b.credit = Math.round((xmap[b.date]||0)*100)/100;
-        covered++;
-      }
-    });
-    const s = (T.summary = T.summary || {});
-    if (covered){
-      s.credit_source = 'xlsx_precise';
-      s.credit_note = (LANG==='en')
-        ? `credit overridden by uploaded xlsx for ${covered} day(s) (server-precise in window); other days remain local estimate.`
-        : `credit 已用上传的用量导出 xlsx 精确覆盖 ${covered} 天（窗口内为服务端精确值）；未覆盖日期仍为本地估算。`;
-      const days = Object.keys(xmap).sort();
-      s.credit_xlsx_date_min = days[0];
-      s.credit_xlsx_date_max = days[days.length-1];
-      
-      if (xmodel && Object.keys(xmodel).length){
-        const wmin = s.credit_xlsx_date_min, wmax = s.credit_xlsx_date_max;
-        const winTokens = {};
-        (T.by_session||[]).forEach(sb=>{
-          const m = sb.model || '';
-          if (!m) return;
-          const d = sb.first_date;
-          if (wmin && wmax && d >= wmin && d <= wmax) winTokens[m] = (winTokens[m]||0) + (sb.tokens||0);
-        });
-        const list = [];
-        for (const [m, info] of Object.entries(xmodel)){
-          const tk = winTokens[m] || 0;
-          const cr = Math.round(info.credit*100)/100;
-          list.push({
-            model: m,
-            requests: info.count,
-            tokens: tk,
-            credit: cr,
-            credit_per_100k: tk ? Math.round(cr/tk*100000*100)/100 : null,
-            zero_credit: (cr <= 0 && tk >= 1_000_000)
-          });
-        }
-        list.sort((a,b)=>{ const av=(a.credit_per_100k==null)?Infinity:a.credit_per_100k; const bv=(b.credit_per_100k==null)?Infinity:b.credit_per_100k; return av-bv; });
-        T.model_cost_official = list;
-      }
-      
-      
-      const startEl = document.getElementById('startDate');
-      const endEl = document.getElementById('endDate');
-      if (startEl && endEl && s.credit_xlsx_date_min && s.credit_xlsx_date_max){
-        startEl.value = s.credit_xlsx_date_min;
-        endEl.value = s.credit_xlsx_date_max;
-        render(s.credit_xlsx_date_min, s.credit_xlsx_date_max);
-      } else {
-        rerenderCharts();
-      }
-    } else {
-      if (s.credit_source !== 'api_precise') s.credit_source = 'local_estimate';
-      s.credit_note = (LANG==='en') ? 'Uploaded xlsx has no overlapping dates; credit stays local estimate.' : '上传的 xlsx 未包含与本地数据重叠的日期，credit 仍为本地估算。';
-      rerenderCharts();
-    }
-    s.creditTotal = Math.round((T.by_day||[]).reduce((a,b)=>a+(b.credit||0),0)*100)/100;
-    statusEl.className = 'xlsx-status';
-    statusEl.textContent = (LANG==='en')
-      ? (covered ? `xlsx loaded: ${covered} day(s) overridden with precise credit; view focused to ${s.credit_xlsx_date_min} ~ ${s.credit_xlsx_date_max}.` : `xlsx loaded: ${covered} day(s) overridden.`)
-      : (covered ? `已加载 xlsx：精确覆盖 ${covered} 天 credit；已聚焦文件区间 ${s.credit_xlsx_date_min} ~ ${s.credit_xlsx_date_max}。` : `已加载 xlsx：精确覆盖 ${covered} 天 credit。`);
-  } catch(e){
-    statusEl.className = 'xlsx-status err';
-    const msg = (e && e.message) ? e.message : (''+e);
-    statusEl.textContent = (LANG==='en') ? ('xlsx parse failed: ' + msg) : ('xlsx 解析失败：' + msg);
-  }
-}
 function setupThemeSkin(){
   applyThemeSkin();
   const tt=document.getElementById('themeSelect');
@@ -644,13 +457,7 @@ function init(){
     const b = ev.target.closest ? ev.target.closest('button[data-spike]') : null;
     if (b) { const d = b.getAttribute('data-spike'); __spikeOpen[d] = !__spikeOpen[d]; renderSpikeDays(); }
   });
-  const xlsxFileEl = document.getElementById('xlsxFile');
-  if (xlsxFileEl) xlsxFileEl.addEventListener('change', ()=>{
-    if (xlsxFileEl.files && xlsxFileEl.files[0]) handleXlsxUpload(xlsxFileEl.files[0]);
-    else { const st=document.getElementById('xlsxStatus'); if(st) st.textContent=''; }
-  });
   render(minD, maxD);
-  renderWarnings();
 }
 
 function warnText(w){
@@ -661,13 +468,28 @@ function warnText(w){
     case 'orphan_credit': return t('warnOrphan')(w.count||0, (w.amount||0).toFixed(2));
     case 'skipped_traces': return t('warnSkipped')(w.count||0, w.names || '');
     case 'bad_credit': return t('warnBadCredit')(w.count||0);
+    case 'credit_only_days': return t('warnCreditOnly')(w.count||0, (w.amount||0).toFixed(2), w.pct||0, (w.days||[]).join(', '));
     default: return w.detail;
   }
+}
+// 「有积分无 token」这条提醒只在按日视图下成立。跨度超过 120 天会切到按周或按月聚合，
+// 缺 token 的那几天被并进更大的桶，图上不会出现断档，此时提醒反而让人费解。
+// 因此只在按日聚合、且断档日期确实落在当前筛选范围内时才显示。
+function warnVisible(w){
+  if (w.type !== 'credit_only_days') return true;
+  if (!w.days || !w.days.length) return true;
+  const st = (document.getElementById('startDate') || {}).value;
+  const en = (document.getElementById('endDate') || {}).value;
+  const hit = w.days.filter(d => (!st || d >= st) && (!en || d <= en));
+  if (!hit.length) return false;
+  return granularityForSpan(st, en).gran === 'day';
 }
 function renderWarnings(){
   const el = document.getElementById('dataWarn');
   if (!el || !T || !T.warnings || !T.warnings.length) return;
-  el.innerHTML = '⚠ ' + T.warnings.map(function(w){ return esc(warnText(w)); }).join('<br>⚠ ');
+  const items = T.warnings.filter(warnVisible);
+  if (!items.length){ el.style.display = 'none'; return; }
+  el.innerHTML = '⚠ ' + items.map(function(w){ return esc(warnText(w)); }).join('<br>⚠ ');
   el.style.display = 'block';
 }
 
@@ -770,7 +592,7 @@ function render(start, end){
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
     `<div class="kpi"><div class="label">${k.label}</div>
-     <div class="val ${k.err?'err':''}">${k.val}${k.est?'<span class="est" title="本地估算">≈</span>':''}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div>
+     <div class="val ${k.err?'err':''}">${k.val}${k.unit?`<span class="unit">${k.unit}</span>`:''}</div>
      ${k.hint?`<div class="kpi-hint ${k.err?'err':''}">${esc(k.hint)}</div>`:''}</div>`).join('');
 
   const dayFilt = T.by_day.filter(d => inRange(d.date));
@@ -795,8 +617,7 @@ function render(start, end){
   cardTitle('cErrors', glT+' 错误数', glT+' Errors');
   if (gkey === 'day'){
     cardHint('cDailyToken', t('hintDailyToken'), t('hintDailyToken'));
-    if (cs === 'xlsx_precise') cardHint('cDailyCredit', t('hintDailyCreditPrecise'), t('hintDailyCreditPrecise'));
-    else cardHint('cDailyCredit', t('hintDailyCredit'), t('hintDailyCredit'));
+    cardHint('cDailyCredit', t('hintDailyCredit'), t('hintDailyCredit'));
   } else {
     cardHint('cDailyCredit', `${glT} credit 总量。`, `${glT} total credit.`);
   }
@@ -812,8 +633,7 @@ function render(start, end){
   
   const creditBadge = document.getElementById('creditBadge');
   if (creditBadge){
-    if (cs === 'api_precise'){ creditBadge.textContent = t('badgeApiPrecise'); creditBadge.className = 'est-badge precise'; }
-    else if (cs === 'xlsx_precise'){ creditBadge.textContent = t('badgePrecise'); creditBadge.className = 'est-badge precise'; }
+    if (cs === 'percall_local'){ creditBadge.textContent = t('badgePercall'); creditBadge.className = 'est-badge precise'; }
     else { creditBadge.textContent = t('badgeLocal'); creditBadge.className = 'est-badge local'; }
   }
   charts.push(new Chart(cDailyCredit,{type:'line',data:{labels:buckets.map(b=>b.label),
@@ -892,92 +712,148 @@ function render(start, end){
   
   
   
-  const offList = T.model_cost_official || [];
-  const useOfficial = offList.length > 0;
-  let costList = [];
-  let costSrcNote = '';
-  if (useOfficial) {
-    costList = offList
-      .filter(m => m.model && m.model !== 'unknown')
-      .map(m => ({...m, sessions: m.requests}));
-    const wmin = (T.summary && (T.summary.billing_date_min || T.summary.credit_xlsx_date_min)) || '';
-    const wmax = (T.summary && (T.summary.billing_date_max || T.summary.credit_xlsx_date_max)) || '';
-    costSrcNote = wmin ? (cs==='api_precise' ? `官方精确（用量 API）· 窗口 ${wmin} ~ ${wmax}` : `官方精确（用量导出）· 窗口 ${wmin} ~ ${wmax}`) : (cs==='api_precise' ? '官方精确（用量 API）' : '官方精确（用量导出）');
-    
-    costList.sort((a,b)=>{
-      const av = (a.credit_per_100k == null) ? Infinity : a.credit_per_100k;
-      const bv = (b.credit_per_100k == null) ? Infinity : b.credit_per_100k;
-      return av - bv;
-    });
-  } else {
-    const costMap = {};
-    sessFilt.forEach(sb=>{
-      const m = sb.model || 'unknown';
-      if(!costMap[m]) costMap[m] = {model:m, sessions:0, tokens:0, credit:0};
-      costMap[m].sessions += 1;
-      costMap[m].tokens += sb.tokens||0;
-      costMap[m].credit += sb.credit||0;
-    });
-    costList = Object.values(costMap)
-      .filter(m => m.model !== 'unknown' && m.tokens > 0)
-      .map(m => ({...m, credit_per_100k: m.tokens ? Math.round(m.credit/m.tokens*1e7)/100 : 0}))
-      .filter(m => m.credit_per_100k > 0);  
-    costList.sort((a,b)=>a.credit_per_100k - b.credit_per_100k);
-  }
+  // ---------- 模型成本与费率（成本实况 + 费率结构） ----------
+  // 用量是可以加总的事实，费率是不可加总的价格，所以分成两组列，不做任何跨模型求和。
+  const costList = (T.by_model_cost || []).slice();
+  const rateByModel = {};
+  (T.model_rate || []).forEach(r => { (rateByModel[r.model] = rateByModel[r.model] || []).push(r); });
+  const curRate = {};
+  Object.keys(rateByModel).forEach(mm => {
+    // 优先取当前生效那条。限免模型没有 is_current 标记，回退取它的 free 记录，
+    // 这样格子里的原因才能写出「限时免费，无费率」，而不是回退成通用文案。
+    const list = rateByModel[mm];
+    const c0 = list.find(x => x.is_current) || list.find(x => x.reason === 'free');
+    if (c0) curRate[mm] = c0;
+  });
+  const reasonTxt = (r) => ({sample:t('reasonSample'), varying:t('reasonVarying'),
+                             routing:t('reasonRouting'), free:t('reasonFree')}[r] || t('rateNA'));
+  const discTxt = (dd) => (dd == null) ? '—'
+      : (Math.abs(dd - 0.5) < 0.03 ? t('discHalf') : (dd * 10).toFixed(1) + '×');
 
   const tmc = document.querySelector('#tModelCost tbody');
   const costNoteEl = document.getElementById('modelCostNote');
-  if (costNoteEl) costNoteEl.textContent = costSrcNote || '';
-  
-  const thCostCount = document.getElementById('thCostCount');
-  if (thCostCount) thCostCount.textContent = useOfficial ? t('thReq') : t('thSessions');
+  if (costNoteEl) costNoteEl.textContent = t('costCaliber');
+
   if (costList.length) {
-    const nums = costList.map(m => m.credit_per_100k).filter(v => typeof v === 'number' && v > 0);
-    const best = nums.length ? Math.min.apply(null, nums) : null;
-    const worst = nums.length ? Math.max.apply(null, nums) : null;
-    tmc.innerHTML = costList.map(m => {
-      const v = m.credit_per_100k;
+    const vals = costList.filter(m => !m.zero_credit).map(m => m.credit_per_million);
+    const best = vals.length ? Math.min.apply(null, vals) : null;
+    const worst = vals.length ? Math.max.apply(null, vals) : null;
+    const rows = [];
+    costList.forEach((m, i) => {
+      const v = m.credit_per_million;
       const col = (best !== null && v === best) ? 'var(--green)'
                 : (worst !== null && v === worst) ? 'var(--red)' : '';
-      const promo = (m.credit === 0 && m.tokens >= 1_000_000) ? '<span class="zero-credit">(限免/促销)</span>' : '';
-      return `<tr>
-        <td><span class="tag">${esc(m.model)}</span>${promo}</td>
-        <td class="num">${m.sessions ?? 0}</td>
+      const promo = m.zero_credit ? ` <span class="zero-credit">(${t('promoTag')})</span>` : '';
+      const rt = curRate[m.model];
+      const rateOk = !!(rt && rt.reliable);
+      // 历史行必须带月份。限免模型（hy3 等）的 period 为空，展开只会得到一行
+      // 没有月份的空壳，所以按 period 过滤掉；当前费率有波动但历史月份可靠的模型
+      // 仍可展开，那些历史数字本身是有效信息。
+      const hist = (rateByModel[m.model] || []).filter(x => !x.is_current && x.period);
+      let rateCells;
+      if (rateOk) {
+        const ttl = rt.low_hours ? ` title="${esc(rt.low_hours)}"` : '';
+        rateCells = `<td class="num">${rt.a == null ? '—' : rt.a}</td>`
+          + `<td class="num">${rt.b == null ? '—' : rt.b}</td>`
+          + `<td class="num">${rt.c == null ? '—' : rt.c}</td>`
+          + `<td class="num"${ttl}>${discTxt(rt.low_discount)}</td>`;
+      } else {
+        const why = reasonTxt(rt && rt.reason);
+        // 原因直接写在格子里而不是塞进 title：静态看板上悬停提示基本不会被发现。
+        // 原因与主文案相同时只显示一次，避免同一句话重复两遍。
+        const whySpan = (why && why !== t('rateNA')) ? `<span class="rate-why">${esc(why)}</span>` : '';
+        rateCells = `<td class="num rate-na" colspan="4">${t('rateNA')}${whySpan}</td>`;
+      }
+      const tog = hist.length ? `<span class="rate-toggle" title="${esc(t('rateHistoryTitle'))}">▸</span>` : '';
+      rows.push(`<tr data-mi="${i}">
+        <td>${tog}<span class="tag">${esc(m.model)}</span>${promo}</td>
+        <td class="num">${m.calls == null ? 0 : m.calls}</td>
         <td class="num">${fmt(m.tokens)}</td>
-        <td class="num">${(m.credit ?? 0).toFixed(2)}</td>
-        <td class="num" style="color:${col};font-weight:600">${(v == null) ? '—' : v}</td>
-      </tr>`;
-    }).join('');
+        <td class="num">${(m.credit == null ? 0 : m.credit).toFixed(2)}</td>
+        <td class="num" style="color:${col};font-weight:600">${v == null ? '—' : v}</td>
+        ${rateCells}
+      </tr>`);
+      // 历史行只承载「某个月单独拟合出的费率」。左侧四列是整段时期的汇总值，
+      // 无法拆到单月，因此合并成一格写明，避免一排横线被读成数据缺失。
+      hist.forEach(x => {
+        rows.push(`<tr class="rate-hist" data-host="${i}" style="display:none">
+          <td>${esc(x.period)} 单月费率<span class="hist-note">（n=${x.n}）</span></td>
+          <td class="num hist-span" colspan="4">${t('rateHistSpan')}</td>
+          <td class="num">${x.a == null ? '—' : x.a}</td>
+          <td class="num">${x.b == null ? '—' : x.b}</td>
+          <td class="num">${x.c == null ? '—' : x.c}</td>
+          <td class="num hist-span">${t('rateHistDisc')}</td>
+        </tr>`);
+      });
+    });
+    tmc.innerHTML = rows.join('');
+    tmc.querySelectorAll('.rate-toggle').forEach(el => {
+      el.addEventListener('click', () => {
+        const mi = el.closest('tr').getAttribute('data-mi');
+        const wasOpen = el.textContent === '▾';
+        el.textContent = wasOpen ? '▸' : '▾';
+        tmc.querySelectorAll(`tr.rate-hist[data-host="${mi}"]`).forEach(rr => {
+          rr.style.display = wasOpen ? 'none' : 'table-row';
+        });
+      });
+    });
   } else {
-    tmc.innerHTML = `<tr><td colspan="5" class="err">${t('emptyCost')}</td></tr>`;
+    tmc.innerHTML = `<tr><td colspan="9" class="err">${t('emptyCost')}</td></tr>`;
   }
 
-  
   const mt = document.getElementById('modelTips');
+  // 与抽取器同一门槛：costList 已是「token ≥ 最大模型 1/100」的那批，这里只排除
+  // 路由/预览类与限免模型。有费率的模型因此必然参与比较，不再出现两套口径。
   const substantial = costList.filter(m =>
     !['auto','unknown'].includes(m.model) &&
     !m.model.includes('preview') && !m.model.includes('agent') &&
-    m.tokens >= 10_000_000 && m.credit > 0
+    !m.zero_credit
   );
   let tipsHtml = '';
   if (substantial.length >= 2) {
-    const cheapest = substantial.reduce((a,b)=>a.credit_per_100k<b.credit_per_100k?a:b);
-    const priciest = substantial.reduce((a,b)=>a.credit_per_100k>b.credit_per_100k?a:b);
-    const save = priciest.credit_per_100k ? ((priciest.credit_per_100k - cheapest.credit_per_100k)/priciest.credit_per_100k*100) : 0;
-    tipsHtml += t('tipOptimize')(esc(cheapest.model), cheapest.credit_per_100k, esc(priciest.model), priciest.credit_per_100k, save.toFixed(0));
+    const cheapest = substantial.reduce((a,b)=>a.credit_per_million<b.credit_per_million?a:b);
+    const priciest = substantial.reduce((a,b)=>a.credit_per_million>b.credit_per_million?a:b);
+    const save = priciest.credit_per_million
+      ? ((priciest.credit_per_million - cheapest.credit_per_million)/priciest.credit_per_million*100) : 0;
+    tipsHtml += t('tipOptimize')(esc(cheapest.model), cheapest.credit_per_million, esc(priciest.model), priciest.credit_per_million, save.toFixed(0));
   }
-  const zeroPromo = costList.filter(m => m.credit===0 && m.tokens>=1_000_000);
-  zeroPromo.forEach(m=>{
+  costList.filter(m => m.zero_credit).forEach(m => {
     tipsHtml += `<br>${t('tipPromo')(esc(m.model))}`;
   });
-  if (!tipsHtml) {
-    tipsHtml = t('tipNoModel');
-  }
+  if (!tipsHtml) tipsHtml = t('tipNoModel');
   mt.innerHTML = tipsHtml;
+
+  // ---------- 单次提问成本榜 ----------
+  const askCard = document.getElementById('askCard');
+  const askStatEl = document.getElementById('askStat');
+  const askBody = document.querySelector('#tAskTop tbody');
+  const as = T.ask_stats || null;
+  const asks = T.ask_top || [];
+  if (askCard && askStatEl && askBody && as && asks.length) {
+    askCard.style.display = '';
+    askStatEl.textContent = t('askStatText')({
+      n: as.count, med: as.median, max: as.max, maxc: as.max_calls,
+      c10n: as.top10pct_n, c10: as.top10pct_share, c1n: as.top1pct_n, c1: as.top1pct_share
+    });
+    askBody.innerHTML = asks.map(a => `<tr>
+      <td>${esc(a.date || '')}</td>
+      <td class="num">${(a.hour >= 0) ? ('0' + a.hour).slice(-2) + ':00' : '—'}</td>
+      <td title="${esc(a.session_title || '')}">${esc((a.session_title || a.sid || '').slice(0, 26))}</td>
+      <td><span class="tag">${esc((a.models || '').slice(0, 40))}</span></td>
+      <td class="num">${a.calls || 0}</td>
+      <td class="num" style="font-weight:600">${(a.credit || 0).toFixed(2)}</td>
+      <td class="num">${(a.share || 0).toFixed(2)}%</td>
+    </tr>`).join('');
+  } else if (askCard) {
+    askCard.style.display = 'none';
+  }
 
   document.getElementById('note').textContent = t('bottomNote');
   renderSpikeDays();
   renderErrorDetail();
+  // 告警能否显示取决于当前聚合粒度（「有积分无 token」只在按日视图下成立），
+  // 所以要随筛选范围一起重算，不能只在初始化时执行一次。
+  renderWarnings();
 }
 
 
