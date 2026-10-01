@@ -16,8 +16,9 @@ WorkBuddy 本地 usage-status 抽取器
     usage-full-<时间戳>.csv 与 usage-full-<时间戳>.xlsx（同源；CSV 每行的分区在 xlsx 里对应一个工作表）
   - ~/.workbuddy/usage-archive/：逐请求归档 + 会话汇总 + 每日总量覆盖层（traceId 去重；--no-archive 关闭）
 
-网络：
-  - 全程零网络请求，不读取宿主 App 的任何凭据
+网络与读取范围：
+  - 全程零网络请求；不读取宿主 App 的凭据、账号与登录态。
+  - 读取系统界面语言，仅用于决定 CSV 表头的语种。
 """
 import sqlite3, json, os, glob, datetime, sys, argparse, shutil, re
 from collections import Counter, defaultdict
@@ -1269,7 +1270,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.5.0",
+    "version": "1.5.1",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -1416,8 +1417,8 @@ try:
     else:
         sys.exit("错误：缺少随包文件 chart.umd.min.js，无法生成离线 HTML。\n"
                  "请确认该文件与 usage_extractor.py 同在 scripts/ 目录下。")
-    if "<!--CHART_JS_ASSET_TAG-->" in tpl:
-        tpl = tpl.replace("<!--CHART_JS_ASSET_TAG-->", chart_tag)
+    if "__CHART_JS_ASSET_TAG__" in tpl:
+        tpl = tpl.replace("__CHART_JS_ASSET_TAG__", chart_tag)
 
     
     
@@ -1508,7 +1509,7 @@ CSV_L = _CSV_LABELS[_csv_lang]
 
 
 # ---------- xlsx 写出（仅用标准库 zipfile + XML，无第三方依赖） ----------
-# 与全量 CSV 同源：CSV 的每个分区对应一个工作表，供在线表格工具与 Excel 直接翻查。
+# 与全量 CSV 同源：CSV 的每个分区对应一个工作表。
 def _write_xlsx(path, sheets, title=""):
     import zipfile
     from xml.sax.saxutils import escape as _xesc
@@ -1754,7 +1755,7 @@ try:
             _write_xlsx(OUT_XLSXF, _xlsx_sheets,
                         title=CSV_L["title"].format(ts=datetime.datetime.now().isoformat(timespec="seconds")))
             print("已生成全量 xlsx:", os.path.basename(OUT_XLSXF),
-                  f"（{len(_xlsx_sheets)} 个工作表，与 CSV 分区一一对应；供在线表格与 Excel 直接翻查）", flush=True)
+                  f"（{len(_xlsx_sheets)} 个工作表，与 CSV 分区一一对应）", flush=True)
         except Exception as e:
             print("全量 xlsx 生成失败（CSV 与看板不受影响）:", e, flush=True)
 except Exception as e:
@@ -1771,3 +1772,8 @@ if warnings:
         print(f"  - {w['detail']}")
 print(f"输出: {OUT_JSON}")
 print(f"输出: {OUT_JS}")
+# 产物敏感性提醒：提问原文只做截断、不做打码；看板内展示用的那套打码不适用于数据文件。
+# 每次运行结束都要让用户看到，不能只写在文档里。
+print("\n⚠ 敏感性提示：本次生成的 usage-status.json / usage-status.js / 全量 CSV 与 xlsx 含会话标题与提问原文。"
+      "提问原文只截断到 300 字、未脱敏，看板内展示所用的打码不适用于这些文件。"
+      "分享或提交到仓库前请先检查。", flush=True)

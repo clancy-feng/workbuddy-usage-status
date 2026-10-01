@@ -10,7 +10,7 @@
 > - **Model cost & rates** — one table, two groups of columns: cost reality shows calls, tokens, credit, and credit per million tokens; rate structure shows non-cached input, cached input, and output unit prices, plus off-peak discount. Both are back-calculated from local per-call detail.
 > - **Costliest single prompts** — the 20 priciest prompts by credit, with concentration stats, so you can find the few calls that actually cost money.
 > - **Cache hit-rate panel** — overall hit rate, a daily trend line, and a per-model ranking.
-> - **Full-dataset CSV and xlsx on every run** — timestamped `usage-full-<timestamp>.csv` and `usage-full-<timestamp>.xlsx` are written next to the dashboard. The CSV carries all 14 sections in a single file for scripted reuse; the xlsx splits the same sections into one worksheet each, so it opens in Excel and online spreadsheet viewers. Headers and section names follow your OS language.
+> - **Full-dataset CSV and xlsx on every run** — timestamped `usage-full-<timestamp>.csv` and `usage-full-<timestamp>.xlsx` are written next to the dashboard. The CSV carries all 14 sections in a single file; the xlsx puts each section in its own worksheet. Headers and section names follow your OS language.
 > - **Auto-archiving against WorkBuddy's 30-day trace cleanup** — every run merges live traces with a local archive, so history keeps accumulating; a dashboard banner reminds you to run at least once every 30 days. An optional `--seed <old snapshot>` imports an older snapshot's daily totals.
 > - **Drill-down** — top-10 sessions expand into per-turn tables with an optional masked prompt column; usage-peak cards expand into that day's session table and model Top 5.
 > 
@@ -22,7 +22,7 @@
 > 
 > **How to use**
 > 
-> - **Chat trigger:** Describe what you want in plain English or Chinese — WorkBuddy detects this skill by *meaning*, not a fixed keyword list. Anything expressing *viewing, generating, or exporting your WorkBuddy usage status / stats / activity dashboard* will trigger it. Examples:
+> - **Chat trigger:** Describe what you want in plain English or Chinese. This skill applies when you ask to view, generate, or export **your own** WorkBuddy usage status / stats / activity dashboard. Examples:
 >   
 >   "generate a WorkBuddy usage dashboard" · "view my recent WorkBuddy usage status" · "show token / credit consumption and model distribution" · "which model is the most cost-effective" · "filter usage by date range" · "which day had the highest usage"
 >   
@@ -61,8 +61,8 @@
 - 离线运行：Chart.js 随 Skill 安装附带。
 - 缓存命中率面板：整体与按模型命中率趋势，看清"谁在帮你省钱"。
 - 三级细节显示：从 Top10 会话点「查看」，轮次表含时间 / 模型 / 状态 / Token / 输入 / 缓存命中 / 调用数 / 工具数 / 思考时长 / 错误；提问列默认隐藏，勾选「显示提问」展开；每轮再点「明细」显示事件摘要。
-- 全量数据双格式同步生成：每次运行自动产出 `usage-full-<时间戳>.csv` 与 `usage-full-<时间戳>.xlsx`，含逐笔调用明细与提问原文。CSV 把全部分区装在一个文件里，便于脚本批量取数；xlsx 把每个分区放进独立工作表，可在 Excel 与在线表格工具里直接翻查。表头与分区名语言随操作系统语言。
-- 自动归档合并：每次运行自动把历史运行数据并入本地归档，可用`--no-archive` 关闭。
+- 全量数据双格式同步生成：每次运行自动产出 `usage-full-<时间戳>.csv` 与 `usage-full-<时间戳>.xlsx`，含逐笔调用明细与提问原文，属敏感内容，分享前请先检查。CSV 把 14 个分区写在同一个文件里，xlsx 把每个分区放进独立工作表。表头与分区名语言随操作系统语言。
+- 自动归档合并：每次运行自动把历史运行数据并入本地归档 `~/.workbuddy/usage-archive/`，可用`--no-archive` 关闭。归档含三个文件：逐请求事实（时间、token 拆分、模型、错误文本，不含提问原文与 credit）、会话汇总（会话标题与 credit）、每日总量（纯数字）。
 - 只读无侵入：以只读模式访问 WorkBuddy 数据，不影响正在运行的程序。
 - 跨平台兼容：支持 Windows/macOS/Linux，Python 3.10+ 即可运行。
 
@@ -99,7 +99,7 @@ clawhub install workbuddy-usage-status
 
 ### 入口 A：对话触发
 
-在 WorkBuddy 对话里用自然语言描述你的需求即可，skill 会根据语义自动识别并引导生成看板。例如：
+在 WorkBuddy 对话里用自然语言描述你的需求即可。本 skill 适用于查看、生成或导出**你自己的** WorkBuddy 本机使用状态与用量看板。例如：
 
 - "生成一个 WorkBuddy 使用信息看板"
 - "查看一下最近 WorkBuddy 的使用状态"
@@ -138,14 +138,14 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 
 脚本在「输出目录」，即你运行命令时所在目录或 `--out` 指定的目录，生成 6 个文件：
 
-| 文件                                            | 说明                                                              |
-| --------------------------------------------- | --------------------------------------------------------------- |
-| `workbuddy-usage-status-dashboard-<时间戳>.html` | 生成的报告文件，文件名带生成时间戳，每次生成独立文件，可保留多份对比                              |
-| `usage-status.json`                           | 聚合后的原始数据，可二次处理                                                  |
-| `usage-status.js`                             | `window.USAGE_STATUS = {...}`，备用                                |
-| `chart.umd.min.js`                            | 图表引擎文件，由脚本自动复制到输出目录，需与 HTML 同目录存放                               |
-| `usage-full-<时间戳>.csv`                        | 全量数据 CSV，14 个分区装在同一个文件里，含模型费率全部阶段、单次提问集中度；适合脚本批量取数              |
-| `usage-full-<时间戳>.xlsx`                       | 全量数据 xlsx，与 CSV 同源，14 个分区对应 14 个工作表，首行冻结；适合在 Excel 或在线表格工具里直接翻查 |
+| 文件                                            | 说明                                        |
+| --------------------------------------------- | ----------------------------------------- |
+| `workbuddy-usage-status-dashboard-<时间戳>.html` | 生成的报告文件，文件名带生成时间戳，每次生成独立文件，可保留多份对比        |
+| `usage-status.json`                           | 聚合后的原始数据，可二次处理                            |
+| `usage-status.js`                             | `window.USAGE_STATUS = {...}`，备用          |
+| `chart.umd.min.js`                            | 图表引擎文件，由脚本自动复制到输出目录，需与 HTML 同目录存放         |
+| `usage-full-<时间戳>.csv`                        | 全量数据 CSV，14 个分区写在同一个文件里，含模型费率全部阶段、单次提问集中度 |
+| `usage-full-<时间戳>.xlsx`                       | 全量数据 xlsx，与 CSV 同源，14 个分区对应 14 个工作表，首行冻结  |
 
 > ⚠ **产物敏感性提醒**：`usage-status.json` / `usage-status.js` / dashboard HTML / 全量 CSV 与 xlsx 中均含**会话标题与用户提问原文摘要**，提问最长 300 字，看板内展示默认脱敏，数据文件内为原文截断。分享或提交到仓库前请先检查敏感性。
 
@@ -268,7 +268,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.5.0（2026-09-30）
+当前最新版本：v1.5.1（2026-10-01）
 ---
 
 ## 👤 关于作者

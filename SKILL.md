@@ -2,7 +2,7 @@
 name: "workbuddy-usage-status"
 slug: workbuddy-usage-status
 displayName: "WorkBuddy 使用状态看板"
-version: 1.5.0
+version: 1.5.1
 description: "离线可视化 WorkBuddy 本机使用数据，以 token 消耗为主指标、credit 为逐次实测精确值，涵盖思考效率、模型分布、成本与费率、单次提问成本、缓存命中率、日期区间筛选、错误监控、用量高峰探查，生成本地使用信息看板，并同步导出全量 CSV 与 xlsx。仅当用户**明确**想查看、生成或导出**自己 WorkBuddy 本机/本账号**的使用状态 / 使用统计 / 工作信息看板时调用；不用于其他产品或系统的用量统计，也不为任意数据生成通用看板。纯本地、全程零网络、可搬运；可选 --credit-xlsx 作参考补充，只在本地缺少逐次明细的日期上补入。 EN: Offline dashboard for WorkBuddy local usage analytics, with token as primary metric and credit measured per call, covering thinking efficiency, model distribution, model cost & rates, costliest single prompts, cache hit rate, date-range filtering, error monitoring, usage-spike inspection; a full CSV and xlsx export is written on every run. Triggers only when the user explicitly wants to view, generate, or export their own WorkBuddy local/account usage status / stats / activity dashboard; not for other products' usage analytics, nor for building generic dashboards from arbitrary data. Fully local and zero-network; the optional --credit-xlsx serves as a reference supplement only, filling days that lack local per-call detail."
 agent_created: true
 license: MIT
@@ -16,20 +16,12 @@ trigger:
   - WorkBuddy 模型分布与性价比
   - WorkBuddy 用量高峰 / 错误监控
 allowed-tools: python3, read_file, write_file
-permissions:
-
-- file_read
-- file_write
-- network
-  metadata:
+metadata:
   clawdbot:
-  emoji: "📊"
-  requires:
-    bins:
-
-      - python3
-
-  requires.env: []
+    emoji: "📊"
+    requires:
+      bins:
+        - python3
 
 ---
 
@@ -68,8 +60,8 @@ permissions:
 - 离线运行：Chart.js 随包附带，零外网依赖
 - 缓存命中率面板：整体与按模型命中率趋势，看清"谁在帮你省钱"；口径为 cached/input，实测 cached>input 时自动切换并标注
 - 三级下钻：从 Top10 会话点「查看」，轮次表含时间 / 模型 / 状态 / Token / 输入 / 缓存命中 / 调用数 / 工具数 / 思考时长 / 错误；提问列默认隐藏，勾选「显示提问」展开，展示时脱敏；每轮再点「明细」看事件摘要，含生成段数与总时长、工具调用清单及耗时、错误类型与摘要
-- 全量数据双格式同步生成：每次运行自动产出 `usage-full-<时间戳>.csv` 与 `usage-full-<时间戳>.xlsx`，两者同源、同为 14 个分区。CSV 把全部分区装在同一个文件里，便于脚本批量取数；xlsx 把每个分区放进独立工作表并冻结首行，可在 Excel 与在线表格工具里直接翻查。表头与分区名语言自动跟随操作系统语言切换
-- 自动归档合并：每次运行自动把逐笔数据并入本地归档（traceId 去重），WorkBuddy 30 天清理 trace 也不再丢历史——对用户完全透明，`--no-archive` 可关
+- 全量数据双格式同步生成：每次运行自动产出 `usage-full-<时间戳>.csv` 与 `usage-full-<时间戳>.xlsx`，两者同源、同为 14 个分区。CSV 把 14 个分区写在同一个文件里；xlsx 把每个分区放进独立工作表并冻结首行。表头与分区名语言自动跟随操作系统语言切换
+- 自动归档合并：每次运行自动把逐笔数据并入本地归档（traceId 去重），WorkBuddy 30 天清理 trace 也不再丢历史——对用户完全透明，`--no-archive` 可关。归档内容是逐请求事实、会话汇总与每日总量，不含提问原文与 credit 明细。
 - 只读无侵入：以只读模式访问 WorkBuddy 数据，不影响正在运行的程序
 - 跨平台兼容：支持 Windows/macOS/Linux，Python 3.10+ 即可运行
 
@@ -119,8 +111,8 @@ python3 scripts/usage_extractor.py [--out <输出目录>] [--home <数据根>] [
 - `usage-status.json` —— 原始聚合数据，供二次处理；
 - `usage-status.js` —— `window.USAGE_STATUS = {...}`，供 HTML 通过 `<script>` 直接引入，以此避开 `file://` 的 fetch 跨域限制。
 - `chart.umd.min.js` —— 图表引擎，由抽取器从 skill 包复制到输出目录，需与 HTML 同目录存放。
-- `usage-full-<时间戳>.csv` —— 全量数据 CSV，分区清单见 `DATA-GUIDE.md` §4.11，与看板同源；14 个分区装在一个文件里，适合脚本批量取数。
-- `usage-full-<时间戳>.xlsx` —— 全量数据 xlsx，与 CSV 同源，14 个分区对应 14 个工作表、首行冻结；适合在 Excel 或在线表格工具里直接翻查预览。
+- `usage-full-<时间戳>.csv` —— 全量数据 CSV，分区清单见 `DATA-GUIDE.md` §4.11，与看板同源；14 个分区写在同一个文件里。
+- `usage-full-<时间戳>.xlsx` —— 全量数据 xlsx，与 CSV 同源，14 个分区对应 14 个工作表、首行冻结。
 
 > ⚠ **产物敏感性提醒**：`usage-status.json` / `usage-status.js` / dashboard HTML / 全量 CSV 与 xlsx 中均含**会话标题与用户提问原文摘要**（提问最长 300 字；看板内展示默认脱敏，数据文件内为原文截断），分享或提交到仓库前请先检查敏感性。
 
@@ -130,7 +122,7 @@ python3 scripts/usage_extractor.py [--out <输出目录>] [--home <数据根>] [
 
 生成完成后，在输出目录找到最新生成的 `workbuddy-usage-status-dashboard-*.html`，按文件名时间戳取最大者，用 `present_files` 打开预览交回给用户。
 
-**只把看板 HTML 作为预览项交付，不要放入其他产物。** 全量 CSV 一旦放进预览项，用户打开时看到的是报错而不是数据：该文件由 14 张列数各异的表拼接而成，首行不是表头，WorkBuddy 的内置预览会把它交给在线表格引擎，该引擎按首行字段数判定列数，往下读到 10 列、15 列的行即解析失败。CSV 与 `usage-full-<时间戳>.xlsx`、`usage-status.json` 一律以文件路径形式在回复里说明，并提示 CSV 用 Excel 或 WPS 打开。
+**只把看板 HTML 作为预览项交付，不要放入其他产物。** 全量 CSV 一旦放进预览项，用户打开时看到的是报错而不是数据：该文件由 14 张列数各异的表拼接而成，首行不是表头，WorkBuddy 的内置预览会把它交给在线表格引擎，该引擎按首行字段数判定列数，往下读到 10 列、15 列的行即解析失败。CSV 与 `usage-full-<时间戳>.xlsx`、`usage-status.json` 一律以文件路径形式在回复里说明。
 
 ## 约束与口径
 

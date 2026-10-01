@@ -1,5 +1,24 @@
 # Changelog / 版本历史
 
+### 📊 当前状态
+
+- Skillhub & Clawhub 双平台下载突破 4000
+- SkillHub TRACE 评分 4.8（优秀）
+- ClawHub 搜 WorkBuddy 排第一
+
+### ⭐ 支持
+
+如果这个看板帮你看清了 WorkBuddy 的用量，欢迎去 GitHub 点个 Star 支持独立开发 🙏
+
+👉 [GitHub - clancy-feng/workbuddy-usage-status: Offline WorkBuddy usage analytics dashboard — token/credit consumption, model cost-performance, spike inspection. Zero network dependency. · GitHub](https://github.com/clancy-feng/workbuddy-usage-status)
+
+## [1.5.1] - 2026-10-01
+
+### 修复 · 安全审计增强
+
+- 去掉了多余的权限声明和文件用途说明。
+- 补充了更多的生成物敏感信息提示。
+
 ## [1.5.0] - 2026-09-30
 
 ### 新功能 · 重大突破——Credit 精确到逐次调用
@@ -25,8 +44,8 @@
 
 ### 新功能 · 随报告生成 xlsx
 
-- 每次运行在输出目录同时生成 `usage-full-<时间戳>.xlsx`，与全量 CSV 同源，14 个分区各占一个工作表，首行冻结、列宽按内容自适应，可在 Excel 与在线表格工具里直接打开翻查。
-- CSV 继续生成，两种格式按用途选用。需要写脚本批量取数用 CSV，需要在表格界面里翻查用 xlsx。
+- 每次运行在输出目录同时生成 `usage-full-<时间戳>.xlsx`，与全量 CSV 同源，14 个分区各占一个工作表，首行冻结、列宽按内容自适应。
+- CSV 继续生成，与 xlsx 内容同源。
 
 ### 移除 · 看板内联上传 xlsx
 
@@ -34,25 +53,13 @@
 
 ## [1.4.1] - 2026-09-17
 
-### 修复 · 安全审计整改
+### 修复 · 安全审计增强
 
 - 修正文档与实现不一致：读写边界、数据源数量、抽取器模块说明按实际行为更新。
 - 补充用户警告：产物含会话标题与提问原文摘要的敏感性提醒；token 参数只传本地路径、凭证不会进入命令行参数。
 - 收紧触发边界：新增触发词表与典型触发说明。
 
 ## [1.4.0] - 2026-09-16
-
-📊 当前状态
-
-- Skillhub & Clawhub 双平台下载突破 2000
-- SkillHub TRACE 评分 4.7（优秀）
-- ClawHub 搜 WorkBuddy 排第一
-
-### ⭐ 支持
-
-如果这个看板帮你看清了 WorkBuddy 的用量，欢迎去 GitHub 点个 Star 支持独立开发 🙏
-
-👉 <https://github.com/clancy-feng/workbuddy-usage-status>
 
 ### 新功能 · 随报告生成全量CSV
 
