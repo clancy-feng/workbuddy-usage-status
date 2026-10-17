@@ -284,7 +284,8 @@ const I18N = {
     warnOrphan: (n,x)=>`${n} historical session(s) totaling ${x} credit have no local per-request details left; they are not shown per-day in the trend.`,
     warnSkipped: (n,names)=>`Skipped ${n} corrupted/unreadable trace file(s) (report may be incomplete): ${names}`,
     warnBadCredit: (n)=>`${n} session(s) had unparseable credit_json; their credit is counted as 0 (token and daily trends unaffected).`,
-    warnCreditOnly: (n,x,p,d)=>`Token detail for ${n} day(s) was deleted by WorkBuddy's 30-day cleanup. Credit is unaffected (${x} total, ${p}% of all credit). Low or zero token values on those days are expected on the daily view. Dates: ${d}.`,
+    warnCreditOnly: (n,d)=>`Token detail for ${n} day(s) was deleted by WorkBuddy's 30-day cleanup. Those days show 0 tokens on the daily chart. Dates: ${d}.`,
+    warnCreditOnlyShort: (n)=>`Token detail for ${n} day(s) was deleted by WorkBuddy's 30-day cleanup. Weeks and months containing those days show lower token totals. Narrow the range to ${TIME_GRAN_DAY_MAX} days or less to see the exact dates by day.`,
     hintModelShare: "Aggregated by model name; Top10 merged into “Others”.",
     hintModelEff: "output token / think seconds",
     hintScatter: "Each point = one request; top-left = high output, low time = efficient.",
@@ -461,6 +462,22 @@ function init(){
 }
 
 function warnText(w){
+  // 「有积分无 token」按粒度给不同详略：按日列出全部日期，周与月只说明影响与查看方式
+  if (w.type === 'credit_only_days'){
+    const st = (document.getElementById('startDate') || {}).value;
+    const en = (document.getElementById('endDate') || {}).value;
+    if (granularityForSpan(st, en).gran === 'day'){
+      // 只统计当前范围内的缺 token 日期，避免把范围外的日子列出来
+      const hit = (w.days || []).filter(d => (!st || d >= st) && (!en || d <= en));
+      if (LANG === 'zh'){
+        return `以下 ${hit.length} 天的 token 明细已被 WorkBuddy 的 30 天清理机制删除，这几天在 token 图上显示为 0。日期：${hit.join('、')}。`;
+      }
+      return t('warnCreditOnly')(hit.length, hit.join(', '));
+    }
+    return (LANG === 'zh')
+      ? `其中 ${w.count||0} 天的 token 明细已被 WorkBuddy 的 30 天清理机制删除，含这些天的周和月，token 合计会偏低，把日期范围收窄到 ${TIME_GRAN_DAY_MAX} 天以内，可看到具体是哪几天。`
+      : t('warnCreditOnlyShort')(w.count||0);
+  }
   if (LANG === 'zh') return w.detail;
   switch (w.type) {
     case 'archive_first_run': return t('warnArchiveFirst');
@@ -468,21 +485,17 @@ function warnText(w){
     case 'orphan_credit': return t('warnOrphan')(w.count||0, (w.amount||0).toFixed(2));
     case 'skipped_traces': return t('warnSkipped')(w.count||0, w.names || '');
     case 'bad_credit': return t('warnBadCredit')(w.count||0);
-    case 'credit_only_days': return t('warnCreditOnly')(w.count||0, (w.amount||0).toFixed(2), w.pct||0, (w.days||[]).join(', '));
     default: return w.detail;
   }
 }
-// 「有积分无 token」这条提醒只在按日视图下成立。跨度超过 120 天会切到按周或按月聚合，
-// 缺 token 的那几天被并进更大的桶，图上不会出现断档，此时提醒反而让人费解。
-// 因此只在按日聚合、且断档日期确实落在当前筛选范围内时才显示。
+// 「有积分无 token」这条提示，只要当前筛选范围内存在缺 token 的日期就显示。
+// 聚合粒度不决定是否显示，只决定详略：按日列出具体日期，周与月只说明影响。
 function warnVisible(w){
   if (w.type !== 'credit_only_days') return true;
   if (!w.days || !w.days.length) return true;
   const st = (document.getElementById('startDate') || {}).value;
   const en = (document.getElementById('endDate') || {}).value;
-  const hit = w.days.filter(d => (!st || d >= st) && (!en || d <= en));
-  if (!hit.length) return false;
-  return granularityForSpan(st, en).gran === 'day';
+  return w.days.some(d => (!st || d >= st) && (!en || d <= en));
 }
 function renderWarnings(){
   const el = document.getElementById('dataWarn');

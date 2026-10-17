@@ -2,11 +2,10 @@
 
 """
 WorkBuddy 本地 usage-status 抽取器
-（面向中文 WorkBuddy 用户 zh-CN 设计；英文能力说明见 SKILL.md 的 description EN 段）
 
 读取（全部只读 mode=ro）~/.workbuddy 下：
   - workbuddy.db  (sessions + session_usage: token预算/上下文上限/credit消耗)
-  - traces/*/trace_*.json  (每次请求的时长/token拆分/思考用时/模型/工具调用/错误)
+  - traces/*/trace_*.json*  (每次请求的时长/token拆分/思考用时/模型/工具调用/错误)
   - projects/*/*.jsonl  (每行的 providerData：提问摘要 <user_query>，以及该次模型调用的
     模型名与精确 credit，用于把 credit 逐次归到真实日期、真实模型)
 
@@ -16,16 +15,13 @@ WorkBuddy 本地 usage-status 抽取器
     usage-full-<时间戳>.csv 与 usage-full-<时间戳>.xlsx（同源；CSV 每行的分区在 xlsx 里对应一个工作表）
   - ~/.workbuddy/usage-archive/：逐请求归档 + 会话汇总 + 每日总量覆盖层（traceId 去重；--no-archive 关闭）
 
-网络与读取范围：
-  - 全程零网络请求；不读取宿主 App 的凭据、账号与登录态。
-  - 读取系统界面语言，仅用于决定 CSV 表头的语种。
 """
-import sqlite3, json, os, glob, datetime, sys, argparse, shutil, re
+import sqlite3, json, os, glob, datetime, sys, argparse, shutil, re, bisect
 from collections import Counter, defaultdict
 
 HOME = os.path.expanduser("~/.workbuddy")
 DB = os.path.join(HOME, "workbuddy.db")
-TRACES = os.path.join(HOME, "traces", "*", "trace_*.json")
+TRACES = os.path.join(HOME, "traces", "*", "trace_*.json*")
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -61,7 +57,7 @@ parser.add_argument("--credit-xlsx", default=None,
 args = parser.parse_args()
 HOME = args.home
 DB = os.path.join(HOME, "workbuddy.db")
-TRACES = os.path.join(HOME, "traces", "*", "trace_*.json")
+TRACES = os.path.join(HOME, "traces", "*", "trace_*.json*")
 OUT_DIR = args.out
 os.makedirs(OUT_DIR, exist_ok=True)
 OUT_JSON = os.path.join(OUT_DIR, "usage-status.json")
@@ -87,6 +83,72 @@ def day_key(ts_ms):
         return "unknown"
     
     return datetime.datetime.fromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d")
+
+
+def _load_jsonl_trace(fp):
+    """读取逐行事件的 trace 文件，还原成 {trace, spans}。
+
+    span 以 span_end 为准，它带 endedAt、duration、status、error 与 toolOutput；
+    span_start 只有起始信息，不采用，避免同一 span 被计两次。
+    """
+    tr = {}
+    spans = []
+    with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                e = json.loads(line)
+            except Exception:
+                continue
+            t = e.get("type")
+            if t == "trace_start":
+                tr = e.get("trace") or {}
+            elif t == "span_end":
+                s = e.get("span")
+                if s:
+                    spans.append(s)
+    return {"trace": tr, "spans": spans}
+
+
+def _agg_usage_from_spans(spans):
+    tok = inp = out = cached = calls = 0
+    models = []
+    for s in spans:
+        if s.get("type") != "generation":
+            continue
+        to = s.get("toolOutput")
+        if not to:
+            continue
+        try:
+            arr = json.loads(to) if isinstance(to, str) else to
+        except Exception:
+            continue
+        if isinstance(arr, dict):
+            arr = [arr]
+        if not isinstance(arr, list):
+            continue
+        for o in arr:
+            if not isinstance(o, dict):
+                continue
+            u = o.get("usage") or {}
+            if not u:
+                continue
+            try:
+                tok += int(u.get("total_tokens") or 0)
+                inp += int(u.get("prompt_tokens") or 0)
+                out += int(u.get("completion_tokens") or 0)
+                det = u.get("prompt_tokens_details") or {}
+                cached += int(det.get("cached_tokens") or 0)
+            except Exception:
+                continue
+            calls += 1
+            m = o.get("model")
+            if m and m not in models:
+                models.append(m)
+    return {"tokens": tok, "input": inp, "output": out, "cached": cached,
+            "calls": calls, "models": models}
 
 
 def _read_xlsx_rows(path):
@@ -250,14 +312,59 @@ by_session = {}
 sess_first = {}
 sess_min = {}
 
+sess_ts_index = []
+sess_ts_keys = []
+_proj_dir = os.path.join(HOME, "projects")
+if os.path.isdir(_proj_dir):
+    print("  建立时间→会话索引 ...", flush=True)
+    for _r, _dirs, _fs in os.walk(_proj_dir):
+        for _fn in _fs:
+            if not _fn.endswith(".jsonl"):
+                continue
+            _sid = _fn[:-6]
+            try:
+                _fh = open(os.path.join(_r, _fn), "r", encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            for _line in _fh:
+                if '"timestamp"' not in _line:
+                    continue
+                try:
+                    _o = json.loads(_line)
+                except Exception:
+                    continue
+                _ts = _o.get("timestamp")
+                if isinstance(_ts, (int, float)) and _ts > 1e12:
+                    sess_ts_index.append((int(_ts), _o.get("sessionId") or _sid))
+    sess_ts_index.sort()
+    sess_ts_keys = [x[0] for x in sess_ts_index]
+
+
+def _sess_by_time(epoch_ms, window_ms=30000):
+    if not sess_ts_keys or not epoch_ms:
+        return ""
+    i = bisect.bisect_left(sess_ts_keys, epoch_ms)
+    best = None
+    for j in (i - 1, i, i + 1):
+        if 0 <= j < len(sess_ts_index):
+            d = abs(sess_ts_index[j][0] - epoch_ms)
+            if best is None or d < best[0]:
+                best = (d, sess_ts_index[j][1])
+    if best and best[0] <= window_ms:
+        return best[1]
+    return ""
+
 files = sorted(glob.glob(TRACES))
 total = len(files)
 for i, fp in enumerate(files):
     if i % 200 == 0:
         print(f"  进度 {i}/{total}", flush=True)
     try:
-        with open(fp, "r", encoding="utf-8", errors="ignore") as f:
-            data = json.load(f)
+        if fp.endswith(".jsonl"):
+            data = _load_jsonl_trace(fp)
+        else:
+            with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+                data = json.load(f)
     except Exception as e:
         skipped_trace_files.append((fp, str(e)[:80]))
         continue
@@ -269,7 +376,16 @@ for i, fp in enumerate(files):
     ended = parse_ts(tr.get("endedAt") or tr.get("ended_at"))
     duration_ms = tr.get("duration") or (int(ended - started) if started and ended else 0)
     total_tokens = tr.get("totalTokens") or 0
-    
+
+    # 新版 trace 缺 trace 级 modelInfo 与 totalTokens，从每次 generation 的响应体 usage 汇总
+    if total_tokens <= 0 or not mi:
+        _agg = _agg_usage_from_spans(spans)
+        if _agg["tokens"] > 0:
+            total_tokens = total_tokens or _agg["tokens"]
+            mi = {"totalInputTokens": _agg["input"], "totalOutputTokens": _agg["output"],
+                  "totalCachedTokens": _agg["cached"], "callCount": _agg["calls"],
+                  "models": _agg["models"]}
+
     if total_tokens <= 0:
         continue
     in_tok = mi.get("totalInputTokens") or 0
@@ -279,6 +395,8 @@ for i, fp in enumerate(files):
     models = mi.get("models") or []
     model_name = ",".join(models) if models else "unknown"
     session_id = tr.get("sessionId") or ""
+    if not session_id and started:
+        session_id = _sess_by_time(int(started))
     status = tr.get("status") or "ok"
 
     
@@ -423,7 +541,6 @@ for i, fp in enumerate(files):
 
 
 
-# ---------- [2.7.5] 自动归档合并（traceId 去重，透明常驻） ----------
 ARCHIVE_DIR = os.path.join(HOME, "usage-archive")
 archive_existed = False
 archived_only = []
@@ -449,8 +566,10 @@ else:
                         continue
         live_ids = {r["id"] for r in requests if r.get("id")}
         new_from_live = [r for r in requests if r.get("id") and r["id"] not in arch_recs]
-        for r in new_from_live:
-            arch_recs[r["id"]] = r
+
+        for r in requests:
+            if r.get("id"):
+                arch_recs[r["id"]] = r
         archived_only = [o for o in arch_recs.values() if o["id"] not in live_ids]
         # 归档独有的错误重放进全局错误统计（el = [type, tool, msg]）
         for r in archived_only:
@@ -1270,7 +1389,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.5.1",
+    "version": "1.6.0",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,

@@ -2,19 +2,27 @@
 
 ### 📊 当前状态
 
-- Skillhub & Clawhub 双平台下载突破 4000
-- SkillHub TRACE 评分 4.8（优秀）
+- Skillhub & Clawhub 双平台下载突破 7000
+- SkillHub TRACE 评分 4.7（优秀）
 - ClawHub 搜 WorkBuddy 排第一
 
 ### ⭐ 支持
 
 如果这个看板帮你看清了 WorkBuddy 的用量，欢迎去 GitHub 点个 Star 支持独立开发 🙏
 
-👉 [GitHub - clancy-feng/workbuddy-usage-status: Offline WorkBuddy usage analytics dashboard — token/credit consumption, model cost-performance, spike inspection. Zero network dependency. · GitHub](https://github.com/clancy-feng/workbuddy-usage-status)
+👉 https://github.com/clancy-feng/workbuddy-usage-status
+
+## [1.6.0] - 2026-10-17
+
+### 修复 · 功能更新
+
+- 内核更新以适配新版Workbuddy数据存储方式。
+- 文案和说明更新。
+- 修复一些显示问题。
 
 ## [1.5.1] - 2026-10-01
 
-### 修复 · 安全审计增强
+### 修复 · 安全性增强
 
 - 去掉了多余的权限声明和文件用途说明。
 - 补充了更多的生成物敏感信息提示。

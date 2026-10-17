@@ -54,17 +54,33 @@
 
 - Token/Credit 全链路可视化：按模型、按日期、按会话统计，一眼定位"烧钱大户"
 - 用量高峰探查：按 token 列出最高的几天，单行显示 token、credit、请求数、会话数、错误率，点「明细」展开当天会话表与模型 Top5。
-- 模型成本与费率：同一张表并排两类信息。一类是实际发生的用量与花费，含调用数、token、积分、每百万 token 积分，按每次调用的真实模型名归属；另一类是从本地逐次明细反推出来的单价，含非缓存输入、缓存输入、输出三档单价与低谷折扣。只列出用量达到最高模型百分之一以上的模型；其中调用数不足 30 或费率有波动的模型不标注费率，并在行内写明原因。
+- 模型成本与费率：同一张表并排两类信息。一类是实际发生的用量与花费，含调用数、token、积分、每百万 token 积分，按每次调用的真实模型名归属；另一类是从本地逐次明细反推出来的单价，含非缓存输入、缓存输入、输出三档单价与低谷折扣。
 - 单次提问成本榜：按积分列出最贵的 20 次提问，并给出集中度统计。
 - 思考效率量化：输出 token ÷ 思考秒数，即 tok/s，横向对比模型效率。
 - 错误集中监控：快速定位报错频繁的会话/模型，降低调试成本。
 - 离线运行：Chart.js 随 Skill 安装附带。
 - 缓存命中率面板：整体与按模型命中率趋势，看清"谁在帮你省钱"。
 - 三级细节显示：从 Top10 会话点「查看」，轮次表含时间 / 模型 / 状态 / Token / 输入 / 缓存命中 / 调用数 / 工具数 / 思考时长 / 错误；提问列默认隐藏，勾选「显示提问」展开；每轮再点「明细」显示事件摘要。
-- 全量数据双格式同步生成：每次运行自动产出 `usage-full-<时间戳>.csv` 与 `usage-full-<时间戳>.xlsx`，含逐笔调用明细与提问原文，属敏感内容，分享前请先检查。CSV 把 14 个分区写在同一个文件里，xlsx 把每个分区放进独立工作表。表头与分区名语言随操作系统语言。
+- 全量数据双格式同步生成：每次运行自动产出 `usage-full-<时间戳>.csv` 与 `usage-full-<时间戳>.xlsx`，含逐笔调用明细与提问原文，分享前请先检查。
 - 自动归档合并：每次运行自动把历史运行数据并入本地归档 `~/.workbuddy/usage-archive/`，可用`--no-archive` 关闭。归档含三个文件：逐请求事实（时间、token 拆分、模型、错误文本，不含提问原文与 credit）、会话汇总（会话标题与 credit）、每日总量（纯数字）。
 - 只读无侵入：以只读模式访问 WorkBuddy 数据，不影响正在运行的程序。
 - 跨平台兼容：支持 Windows/macOS/Linux，Python 3.10+ 即可运行。
+
+---
+
+## 💖 支持这个项目
+
+> 📊 已被 **7000+** WorkBuddy 用户下载使用，覆盖 SkillHub & ClawHub 双平台。
+
+如果这个工具帮到了你，欢迎：
+
+- ⭐ 去 GitHub 点个 Star
+- 🐛 遇到问题提 Issue
+- 📢 分享给你的 WorkBuddy 用户朋友
+
+**GitHub**：https://github.com/clancy-feng/workbuddy-usage-status
+
+🏆 SkillHub TRACE 评分 4.7/5.0 · ClawHub 搜索 "WorkBuddy" 排名第一
 
 ---
 
@@ -153,7 +169,7 @@ Windows 用户请将上述命令中的 `python3` 替换为 `python`。
 
 ### credit 的来源与可选补充
 
-**现默认就已精确到每一次调用。** 每天、每个模型的 credit 来自本地会话文件里每一次模型调用的精确积分，按该次调用真正发生的时间归集到当日，不再用之前那种「把一个会话的 credit 整体挂到它首次出现的那天」的做法。
+每天、每个模型的 credit 来自本地会话文件里每一次模型调用的精确积分，按该次调用真正发生的时间归集到当日。
 
 > ⚠ **1.5.0 之前生成的旧快照和旧归档，其 credit 不可再用。** 旧快照里的 credit 是按会话首现日挂出来的旧口径，与现在的逐日实测值不在同一个口径上。本 skill 在应用历史快照时只取其中的 token 等总量字段，不再采用其 credit。
 
@@ -191,26 +207,14 @@ python3 scripts/usage_extractor.py --out ./report
 
 | 指标        | 算法                                                                                                                     | 数据来源                                   |
 | --------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| 思考用时      | 每条 trace 里 `type=generation` 的 span 时长之和                                                                               | `traces/*/trace_*.json`                |
-| 思考效率      | 输出 token ÷ 思考秒数，即 tok/s                                                                                                | `traces/*/trace_*.json`                |
-| token 消耗  | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合                                                                                      | `traces/*/trace_*.json`                |
-| 缓存命中率     | `totalCachedTokens ÷ totalInputTokens`，若实测 cached>input 自动切换为 `cached/(in+cached)`；按天/模型聚合；模型排行仅收录调用数 ≥ 10             | `traces/*/trace_*.json`                |
+| 思考用时      | 每条 trace 里 `type=generation` 的 span 时长之和                                                                               | `traces/`                              |
+| 思考效率      | 输出 token ÷ 思考秒数，即 tok/s                                                                                                | `traces/`                              |
+| token 消耗  | `totalTokens`（输入+输出+缓存）按会话/模型/天聚合                                                                                      | `traces/`                              |
+| 缓存命中率     | `totalCachedTokens ÷ totalInputTokens`，若实测 cached>input 自动切换为 `cached/(in+cached)`；按天/模型聚合；模型排行仅收录调用数 ≥ 10             | `traces/`                              |
 | credit 消耗 | 逐次实测：每次模型调用的 `providerData.rawUsage.credit` 按调用时间归日，可再按模型拆分；本地无明细的会话回退账本并单独提示                                          | `projects/*/*.jsonl`，回退 `workbuddy.db` |
 | 模型成本与费率   | 成本实况＝该模型积分 ÷ 该模型 token × 100 万；费率结构＝按模型与月份做无截距三元最小二乘，月内再识别低谷时段。表内只列 token ≥ 最大模型的 1/100 的模型；费率进主表需调用数 ≥ 30 且 R² ≥ 0.95 | `projects/*/*.jsonl`                   |
 | 单次提问成本    | 按 `conversationRequestId` 汇总该次提问触发的全部模型调用积分，另给集中度统计                                                                    | `projects/*/*.jsonl`                   |
 | Top 会话    | 按 token 消耗降序取前 10 个会话，列出标题/token/思考时长/credit/错误数                                                                       | `traces/*` + `workbuddy.db`            |
-
----
-
-## 6. 已知限制
-
-1. 首跑耗时：首次全量解析 traces 需 10–30 秒。
-
-2. **全程零网络请求**：脚本不发起任何出站请求。
-
-3. **WorkBuddy 现只保留最近 30 天的 traces**：超期的逐笔明细会被删除。本 skill 每次运行会自动归档到 `~/.workbuddy/usage-archive/`，之后被清理也不影响看板——但归档只在运行时发生：**请至少每 30 天运行一次**，建议配置每日定时自动化。断档超 30 天期间的逐笔明细无法追溯，首次运行只能看到最近 30 天。被清理日期的每日总量可用 `--seed <旧快照>` 恢复。
-
----
 
 ## 7. 故障排查
 
@@ -268,8 +272,7 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 
 详细版本变更记录请查看 CHANGELOG.md。
 
-当前最新版本：v1.5.1（2026-10-01）
----
+## 当前最新版本：v1.6.0（2026-10-17）
 
 ## 👤 关于作者
 
@@ -281,19 +284,3 @@ A：用自然语言描述「查看 / 生成 WorkBuddy 使用状态」即可，�
 - ClawHub：workbuddy-usage-status
 
 ---
-
-## 💖 支持这个项目
-
-> 📊 已被 **4000+** WorkBuddy 用户下载使用，覆盖 SkillHub & ClawHub 双平台。
-
-如果这个工具帮到了你，欢迎：
-
-- ⭐ 去 GitHub 点个 Star
-- 🐛 遇到问题提 Issue
-- 📢 分享给你的 WorkBuddy 用户朋友
-
-**GitHub**：<https://github.com/clancy-feng/workbuddy-usage-status>
-
----
-
-🏆 SkillHub TRACE 评分 4.8/5.0 · ClawHub 搜索 "WorkBuddy" 排名第一
