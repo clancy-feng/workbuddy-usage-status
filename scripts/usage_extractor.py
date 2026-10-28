@@ -1389,7 +1389,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.6.0",
+    "version": "1.6.1",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,

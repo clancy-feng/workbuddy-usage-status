@@ -139,7 +139,7 @@ __CHART_JS_ASSET_TAG__
   <div class="grid" data-page-node-id="K4cxSS9Gtv68o8Q6Q4z87B">
     <div class="card" data-page-node-id="ZsKexyHPbVK58PPUvO3cAa"><h3 data-i18n="cardDailyToken" data-page-node-id="PxAxNV5JPBscKzBhu2Koze">每日 Token 消耗</h3><div class="hint" data-i18n="hintDailyToken" data-page-node-id="CHiQMEEguPqejS3AnKmf5y">按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。</div><canvas id="cDailyToken" data-page-node-id="3tWXhW8RFsVUGT6FpIbwQA"></canvas></div>
     <div class="card" data-page-node-id="cEntnmcMEDCbCS1n2fpb9C"><h3 data-i18n="cardDailyThink" data-page-node-id="7BQJZneucc6KJXSxGCifbR">每日思考用时（小时）</h3><canvas id="cDailyThink" data-page-node-id="06jp5DbmxKo4QJwdvewypw"></canvas></div>
-    <div class="card" data-page-node-id="eVq6BaCQud0h5WOdhwxhBu"><h3 data-i18n="cardDailyCredit" data-page-node-id="jt6dsEiyEOWbExDn0OiyrJ">每日积分消耗（credit）<span class="est-badge local" id="creditBadge" data-page-node-id="fnaHx4DKZPm5bFFKJHgktm"></span></h3><div class="hint" data-i18n="hintDailyCredit" data-page-node-id="rn2rP8C2kqBgDYbFzqks1S">逐次实测：每一次模型调用的 credit 取自本地会话文件 providerData.rawUsage，按该次调用发生的时间归入当日，是真实日值，可再按模型与时段拆分。</div><canvas id="cDailyCredit" data-page-node-id="OPTvLPCAEklZjhIbxBHdwm"></canvas></div>
+    <div class="card" data-page-node-id="eVq6BaCQud0h5WOdhwxhBu"><h3 data-i18n="cardDailyCredit" data-page-node-id="jt6dsEiyEOWbExDn0OiyrJ">每日积分消耗（credit）<span class="est-badge local" id="creditBadge" data-page-node-id="fnaHx4DKZPm5bFFKJHgktm"></span></h3><div class="hint" data-i18n="hintDailyCredit" data-page-node-id="rn2rP8C2kqBgDYbFzqks1S">本图记录每日调用模型的积分消耗。</div><canvas id="cDailyCredit" data-page-node-id="OPTvLPCAEklZjhIbxBHdwm"></canvas></div>
     <div class="card" data-page-node-id="c9NcINzo50q55so3JBI4uo"><h3 data-i18n="cardModelShare" data-page-node-id="GnSYG6dI9jzkwtULCIsMdf">各模型 Token 占比</h3><div class="hint" data-i18n="hintModelShare" data-page-node-id="CnGC9LDjkSJzOxmJoGV5A1">按模型名称聚合，Top10 之外合并为「其他」</div><canvas id="cModelShare" data-page-node-id="lQfjH5KGw1NHG3pj1D0fx5"></canvas></div>
     <div class="card" data-page-node-id="cRFfOJGmWgo29kEfKFalsN"><h3 data-i18n="cardModelEff" data-page-node-id="0Pwl2loa99fEKzHckr4m6y">主要模型思考效率</h3><div class="hint" data-i18n="hintModelEff" data-page-node-id="Z1GBA5J9czNj4CCEhEqqVI">输出 token / 思考秒数；仅统计样本数 ≥ 10 的模型（少量任务的比值受噪声主导，不计入排名）</div><canvas id="cModelEff" data-page-node-id="zBvv6Hz6uBoLLn7eE4eXis"></canvas></div>
     <div class="card" data-page-node-id="9mSW2giYHUWmgNLBI3GYLB"><h3 data-i18n="cardScatter" data-page-node-id="vOOt2oaraH3vI06ppCjMZW">思考效率散点：思考用时 × 输出 token</h3><div class="hint" data-i18n="hintScatter" data-page-node-id="42hAAhmEE9pOBEzRzH1pPT">每个点=一次请求；左上方=高产出低耗时=高效率</div><canvas id="cScatter" data-page-node-id="dXJvZVoqKkeE0TazTtpDrL"></canvas></div>
@@ -220,7 +220,7 @@ const I18N = {
     unitHour: "小时", unitTokS: "tok/s",
     cardDailyToken: "每日 Token 消耗", cardDailyCredit: "每日积分消耗（credit）", cardDailyThink: "每日思考用时（小时）",
     hintDailyToken: "按请求 startedAt 的本地时区归日，精确反映每天的真实 token 用量。",
-    hintDailyCredit: "逐次实测：每一次模型调用的 credit 取自本地会话文件 providerData.rawUsage，按该次调用发生的时间归入当日，是真实日值，可再按模型与时段拆分。",
+    hintDailyCredit: "本图记录每日调用模型的积分消耗。",
     badgeLocal: "本地估算", badgePercall: "逐次实测",
     cardModelShare: "各模型 Token 占比", cardModelEff: "主要模型思考效率",
     cardScatter: "思考效率散点：思考用时 × 输出 token", cardTopSessions: "Top 10 会话",
@@ -273,7 +273,7 @@ const I18N = {
     unitHour: "h", unitTokS: "tok/s",
     cardDailyToken: "Daily Token Usage", cardDailyCredit: "Daily Credit", cardDailyThink: "Daily Thinking Time (hours)",
     hintDailyToken: "Attributed by local timezone of each request's startedAt; reflects true daily token usage.",
-    hintDailyCredit: "Per-call measured: each model call's credit is read from the local session file (providerData.rawUsage) and attributed to the day the call actually happened, so the daily series is real and can be split by model and time of day.",
+    hintDailyCredit: "This chart records the daily credit consumed by model calls.",
     badgeLocal: "Local estimate", badgePercall: "Per-call measured",
     cardModelShare: "Token Share by Model", cardModelEff: "Primary Model Thinking Efficiency",
     cardScatter: "Efficiency Scatter: Think Time × Output Token", cardTopSessions: "Top 10 Sessions",
@@ -285,7 +285,7 @@ const I18N = {
     warnSkipped: (n,names)=>`Skipped ${n} corrupted/unreadable trace file(s) (report may be incomplete): ${names}`,
     warnBadCredit: (n)=>`${n} session(s) had unparseable credit_json; their credit is counted as 0 (token and daily trends unaffected).`,
     warnCreditOnly: (n,d)=>`Token detail for ${n} day(s) was deleted by WorkBuddy's 30-day cleanup. Those days show 0 tokens on the daily chart. Dates: ${d}.`,
-    warnCreditOnlyShort: (n)=>`Token detail for ${n} day(s) was deleted by WorkBuddy's 30-day cleanup. Weeks and months containing those days show lower token totals. Narrow the range to ${TIME_GRAN_DAY_MAX} days or less to see the exact dates by day.`,
+    warnCreditOnlyShort: (n,lo,hi)=>`Token detail for ${n} day(s) was deleted by WorkBuddy's 30-day cleanup. Weeks and months containing those days show lower token totals. Earliest ${lo}, latest ${hi}; narrow to ${TIME_GRAN_DAY_MAX} days or less to list the dates within that range.`,
     hintModelShare: "Aggregated by model name; Top10 merged into “Others”.",
     hintModelEff: "output token / think seconds",
     hintScatter: "Each point = one request; top-left = high output, low time = efficient.",
@@ -475,8 +475,12 @@ function warnText(w){
       return t('warnCreditOnly')(hit.length, hit.join(', '));
     }
     return (LANG === 'zh')
-      ? `其中 ${w.count||0} 天的 token 明细已被 WorkBuddy 的 30 天清理机制删除，含这些天的周和月，token 合计会偏低，把日期范围收窄到 ${TIME_GRAN_DAY_MAX} 天以内，可看到具体是哪几天。`
-      : t('warnCreditOnlyShort')(w.count||0);
+      ? (function(){
+          const ds = w.days || [];
+          const lo = ds[0] || '', hi = ds.length ? ds[ds.length - 1] : '';
+          return `共 ${w.count||0} 天的 token 明细已被 WorkBuddy 的 30 天清理机制删除，含这些天的周和月，token 合计会偏低。最早 ${lo}，最晚 ${hi}；收窄到 ${TIME_GRAN_DAY_MAX} 天以内，可列出该范围内的具体日期。`;
+        })()
+      : t('warnCreditOnlyShort')(w.count||0, (w.days||[])[0]||'', (w.days||[]).slice(-1)[0]||'');
   }
   if (LANG === 'zh') return w.detail;
   switch (w.type) {
@@ -625,15 +629,13 @@ function render(start, end){
   const cardTitle = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('h3'); if(h){ h.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; }); h.prepend(document.createTextNode(zh?zhTxt:enTxt)); } } };
   const cardHint = (cid, zhTxt, enTxt)=>{ const c=document.querySelector('#'+cid); if(c){const h=c.closest('.card').querySelector('.hint'); if(h) h.textContent = zh?zhTxt:enTxt;} };
   cardTitle('cDailyToken', glT+' Token 消耗', glT+' Token Usage');
-  cardTitle('cDailyCredit', glT+' 积分消耗（credit）', glT+' Credit');
+  cardTitle('cDailyCredit', '积分消耗（credit）', 'Credit');
   cardTitle('cDailyThink', glT+' 思考用时（小时）', glT+' Thinking Time (hours)');
   cardTitle('cErrors', glT+' 错误数', glT+' Errors');
   if (gkey === 'day'){
     cardHint('cDailyToken', t('hintDailyToken'), t('hintDailyToken'));
-    cardHint('cDailyCredit', t('hintDailyCredit'), t('hintDailyCredit'));
-  } else {
-    cardHint('cDailyCredit', `${glT} credit 总量。`, `${glT} total credit.`);
   }
+  cardHint('cDailyCredit', t('hintDailyCredit'), t('hintDailyCredit'));
 
   destroyCharts();
 
@@ -649,10 +651,16 @@ function render(start, end){
     if (cs === 'percall_local'){ creditBadge.textContent = t('badgePercall'); creditBadge.className = 'est-badge precise'; }
     else { creditBadge.textContent = t('badgeLocal'); creditBadge.className = 'est-badge local'; }
   }
-  charts.push(new Chart(cDailyCredit,{type:'line',data:{labels:buckets.map(b=>b.label),
-    datasets:[{label:t('dsCredit'),data:buckets.map(b=>b.credit),borderColor:accent,
+  // 积分消耗固定按天描点，X 轴只在周一处出刻度。长跨度下按天出全部刻度会挤成一团，
+  // 因此用 callback 过滤标签、用 grid.color 过滤竖线，两者保持一致。
+  const isMon = v => { const s = String(v).slice(0, 10); const dd = new Date(s + 'T00:00:00'); return !isNaN(dd) && dd.getDay() === 1; };
+  charts.push(new Chart(cDailyCredit,{type:'line',data:{labels:dayFilt.map(d=>d.date),
+    datasets:[{label:t('dsCredit'),data:dayFilt.map(d=>d.credit),borderColor:accent,
       backgroundColor:'rgba('+accentRgb+',.15)',fill:true,tension:.3,pointRadius:2}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{grid},y:{grid,ticks:{callback:v=>short(v)}}}}}));
+    options:{plugins:{legend:{display:false}},scales:{
+      x:{grid:{color:ctx=>isMon(ctx.tick.value)?gridColor:'transparent'},
+        ticks:{autoSkip:false,callback:function(v){const s=this.getLabelForValue(v);return isMon(s)?String(s).slice(5):'';}}},
+      y:{grid,ticks:{callback:v=>short(v)}}}}}));
 
   
   charts.push(new Chart(cDailyThink,{type:'bar',data:{labels:buckets.map(b=>b.label),

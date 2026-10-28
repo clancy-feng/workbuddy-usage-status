@@ -2,7 +2,7 @@
 
 ### 📊 当前状态
 
-- Skillhub & Clawhub 双平台下载突破 7000
+- Skillhub & Clawhub 双平台下载突破 **10000!**
 - SkillHub TRACE 评分 4.7（优秀）
 - ClawHub 搜 WorkBuddy 排第一
 
@@ -11,6 +11,13 @@
 如果这个看板帮你看清了 WorkBuddy 的用量，欢迎去 GitHub 点个 Star 支持独立开发 🙏
 
 👉 https://github.com/clancy-feng/workbuddy-usage-status
+
+## [1.6.1] - 2026-10-28
+
+### 功能更新
+
+- 积分(Credit)图示优化，按天列出每日积分消耗，显示更直观。
+- 文案和说明更新。
 
 ## [1.6.0] - 2026-10-17
 
