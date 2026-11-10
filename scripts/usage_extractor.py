@@ -1006,6 +1006,12 @@ for _a in _ask_list:
 _ask_credits = [a["credit"] for a in _ask_list]
 _ask_n = len(_ask_credits)
 ask_top = _ask_list[:20]
+# 全量提问明细供看板按所选日期范围重新排名，只带表格需要的字段。
+ask_all = [{"date": a["date"], "sid": a["sid"],
+            "session_title": (a.get("session_title") or "")[:26],
+            "models": (a.get("models") or "")[:40],
+            "calls": a["calls"], "credit": a["credit"]}
+           for a in _ask_list]
 ask_stats = {
     "count": _ask_n,
     "credit": round(_ask_total, 2),
@@ -1389,7 +1395,7 @@ error_detail = {
 }
 
 summary = {
-    "version": "1.6.1",
+    "version": "1.6.5",
     "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
     "credit_source": credit_source,
     "credit_note": credit_note,
@@ -1436,6 +1442,7 @@ out = {
     "by_model_cost": model_cost_list,
     "model_rate": model_rate,
     "ask_top": ask_top,
+    "ask_all": ask_all,
     "ask_stats": ask_stats,
     "model_tips": model_tips,
     "spike_days": spike_days,

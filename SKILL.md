@@ -2,7 +2,7 @@
 name: "workbuddy-usage-status"
 slug: workbuddy-usage-status
 displayName: "WorkBuddy 使用状态看板"
-version: 1.6.1
+version: 1.6.5
 description: "离线可视化 WorkBuddy 本机使用数据，以 token 消耗为主指标、credit 为逐次实测精确值，涵盖思考效率、模型分布、成本与费率、单次提问成本、缓存命中率、日期区间筛选、错误监控、用量高峰探查，生成本地使用信息看板，并同步导出全量 CSV 与 xlsx。仅当用户**明确**想查看、生成或导出**自己 WorkBuddy 本机/本账号**的使用状态 / 使用统计 / 工作信息看板时调用；不用于其他产品或系统的用量统计，也不为任意数据生成通用看板。纯本地、全程零网络、可搬运；可选 --credit-xlsx 作参考补充，只在本地缺少逐次明细的日期上补入。 EN: Offline dashboard for WorkBuddy local usage analytics, with token as primary metric and credit measured per call, covering thinking efficiency, model distribution, model cost & rates, costliest single prompts, cache hit rate, date-range filtering, error monitoring, usage-spike inspection; a full CSV and xlsx export is written on every run. Triggers only when the user explicitly wants to view, generate, or export their own WorkBuddy local/account usage status / stats / activity dashboard; not for other products' usage analytics, nor for building generic dashboards from arbitrary data. Fully local and zero-network; the optional --credit-xlsx serves as a reference supplement only, filling days that lack local per-call detail."
 agent_created: true
 license: MIT
@@ -26,7 +26,7 @@ metadata:
 
 ## 💖 支持这个项目
 
-> 📊 已被 **7000+** WorkBuddy 用户下载使用，覆盖 SkillHub & ClawHub 双平台。
+> 📊 已被 **10000+** WorkBuddy 用户下载使用，覆盖 SkillHub & ClawHub 双平台。
 
 如果这个工具帮到了你，欢迎：
 
@@ -51,7 +51,7 @@ metadata:
 - Token/Credit 全链路可视化：按模型、按日期、按会话统计，一眼定位"烧钱大户"
 - 用量高峰探查：按 token 列出最高的几天，单行显示 token、credit、请求数、会话数、错误率，点「明细」展开当天会话表与模型 Top5
 - 模型成本与费率：同一张表并排两类信息。一类是实际用量与花费，含调用数 / token / 积分 / 每百万 token 积分，按每次调用真实的模型名归属；另一类是从本地逐次明细反推的单价，含非缓存输入 / 缓存输入 / 输出三档单价与低谷折扣。
-- 单次提问成本榜：一次提问会触发多次模型调用，按积分列出最贵的 20 次，并给出集中度，即最贵的 1% 与 10% 提问各贡献多少积分，用于定位真正费钱的那几次
+- 单次提问成本榜：一次提问会触发多次模型调用，按积分列出所选日期范围内最贵的 20 次（不足 20 次则全部列出），并给出集中度，即最贵的 1% 与 10% 提问各贡献多少积分，用于定位真正费钱的那几次
 - 思考效率量化：输出 token ÷ 思考秒数，即 tok/s，横向对比模型思考效率
 - 错误集中监控：快速定位报错频繁的会话/模型，降低调试成本，可导出错误详情。
 - 离线运行：Chart.js 随包附带，零外网依赖
