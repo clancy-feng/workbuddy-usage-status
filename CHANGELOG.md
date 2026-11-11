@@ -12,7 +12,7 @@
 
 👉 https://github.com/clancy-feng/workbuddy-usage-status
 
-## [1.6.5] - 2026-11-10
+## [1.6.5] - 2026-11-11
 
 ### 功能更新
 
